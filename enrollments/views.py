@@ -14,7 +14,7 @@ from drf_spectacular.utils import extend_schema
 from .models import Enrollment, Payment
 from accounts.models import CustomUser
 from gyms.models import Gym
-from permissions.bass_permissions import is_gym_employee
+from permissions.permission_helpers import is_gym_employee
 from rest_framework.response import Response
 from .services.enrollment_services import create_enrollment, cancel_enrollment_service
 from .services.payment_services import confirm_payment

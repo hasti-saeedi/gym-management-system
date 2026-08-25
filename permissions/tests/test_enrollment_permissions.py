@@ -1,0 +1,1096 @@
+from django.test import TestCase
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
+
+from rest_framework.test import APIRequestFactory
+from rest_framework.request import Request
+from rest_framework.parsers import JSONParser
+
+from gyms.models import Gym, GymMembership
+from classes.models import GymClass
+from enrollments.models import Enrollment, Payment
+
+from permissions.enrollment_permissions import (
+    CanViewEnrollment,
+    CanCreateEnrollment,
+    CanManageEnrollment,
+    CanCancelEnrollment,
+    CanViewPayment,
+    CanCreatePayment,
+    CanManagePayment,
+    CanConfirmPayment,
+)
+
+
+User = get_user_model()
+
+
+# ============================================================
+# Enrollment Permission Tests
+# ============================================================
+
+class EnrollmentPermissionTest(TestCase):
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+        # ----------------------------------------------------
+        # Gyms
+        # ----------------------------------------------------
+
+        self.gym = Gym.objects.create(
+            name="Test Gym",
+            address="Tehran",
+            phone="09123456789",
+            email="gym@test.com",
+        )
+
+        self.other_gym = Gym.objects.create(
+            name="Other Gym",
+            address="Tehran",
+            phone="09123456788",
+            email="other@test.com",
+        )
+
+        # ----------------------------------------------------
+        # Users
+        # ----------------------------------------------------
+
+        self.owner = User.objects.create_user(
+            username="owner",
+            password="Test1234",
+        )
+
+        self.manager = User.objects.create_user(
+            username="manager",
+            password="Test1234",
+        )
+
+        self.staff = User.objects.create_user(
+            username="staff",
+            password="Test1234",
+        )
+
+        self.trainer = User.objects.create_user(
+            username="trainer",
+            password="Test1234",
+        )
+
+        self.member = User.objects.create_user(
+            username="member",
+            password="Test1234",
+        )
+
+        self.other_member = User.objects.create_user(
+            username="other_member",
+            password="Test1234",
+        )
+
+        self.superuser = User.objects.create_superuser(
+            username="admin",
+            password="Test1234",
+        )
+
+        # ----------------------------------------------------
+        # Memberships
+        # ----------------------------------------------------
+
+        GymMembership.objects.create(
+            user=self.owner,
+            gym=self.gym,
+            role=GymMembership.Role.OWNER,
+            share_percentage=50,
+        )
+
+        GymMembership.objects.create(
+            user=self.manager,
+            gym=self.gym,
+            role=GymMembership.Role.MANAGER,
+            salary=1000,
+        )
+
+        GymMembership.objects.create(
+            user=self.staff,
+            gym=self.gym,
+            role=GymMembership.Role.STAFF,
+            salary=800,
+        )
+
+        GymMembership.objects.create(
+            user=self.trainer,
+            gym=self.gym,
+            role=GymMembership.Role.TRAINER,
+            salary=900,
+        )
+
+        GymMembership.objects.create(
+            user=self.member,
+            gym=self.gym,
+            role=GymMembership.Role.MEMBER,
+        )
+
+        GymMembership.objects.create(
+            user=self.other_member,
+            gym=self.other_gym,
+            role=GymMembership.Role.MEMBER,
+        )
+
+        # ----------------------------------------------------
+        # Gym Class
+        # ----------------------------------------------------
+
+        self.gym_class = GymClass.objects.create(
+            name="Python Class",
+            gym=self.gym,
+            trainer=self.trainer,
+            start_date="2026-08-20",
+            end_date="2026-09-20",
+            start_time="10:00",
+            end_time="11:00",
+            capacity=20,
+            regular_days=["monday"],
+            price=1000,
+            single_session_price=100,
+        )
+
+        # ----------------------------------------------------
+        # Enrollment
+        # ----------------------------------------------------
+
+        self.enrollment = Enrollment.objects.create(
+            gym_class=self.gym_class,
+            user=self.member,
+            status="approved",
+            enrollment_type="semester",
+        )
+
+        # ----------------------------------------------------
+        # Payment
+        # ----------------------------------------------------
+
+        self.payment = Payment.objects.create(
+            enrollment=self.enrollment,
+            amount=1000,
+            status="pending",
+        )
+
+    # ========================================================
+    # Helpers
+    # ========================================================
+
+    def make_request(
+        self,
+        user,
+        method="get",
+        data=None,
+    ):
+        request = getattr(
+            self.factory,
+            method,
+        )(
+            "/api/gyms/{}/enrollments/".format(self.gym.id),
+            data=data or {},
+            format="json",
+        )
+
+        request.user = user
+
+        return request
+
+    def make_drf_request(
+        self,
+        user,
+        method="post",
+        data=None,
+    ):
+        request = getattr(
+            self.factory,
+            method,
+        )(
+            "/api/gyms/{}/enrollments/".format(self.gym.id),
+            data=data or {},
+            format="json",
+        )
+
+        request = Request(
+            request,
+            parsers=[JSONParser()],
+        )
+
+        request.user = user
+
+        return request
+
+    def make_view(self, gym_id=None):
+        class MockView:
+            pass
+
+        view = MockView()
+
+        view.kwargs = {
+            "gym_id": gym_id or self.gym.id
+        }
+
+        return view
+
+    # ========================================================
+    # CanViewEnrollment
+    # ========================================================
+
+    def test_owner_can_view_enrollments(self):
+        request = self.make_request(self.owner)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanViewEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_manager_can_view_enrollments(self):
+        request = self.make_request(self.manager)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanViewEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_staff_can_view_enrollments(self):
+        request = self.make_request(self.staff)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanViewEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_trainer_cannot_view_enrollments(self):
+        request = self.make_request(self.trainer)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanViewEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_member_cannot_view_enrollments(self):
+        request = self.make_request(self.member)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanViewEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_unauthenticated_user_cannot_view_enrollments(self):
+        request = self.make_request(self.member)
+        request.user = AnonymousUser()
+
+        view = self.make_view()
+
+        self.assertFalse(
+            CanViewEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_superuser_can_view_enrollments(self):
+        request = self.make_request(self.superuser)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanViewEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_user_cannot_view_enrollments_of_other_gym(self):
+        request = self.make_request(self.owner)
+
+        view = self.make_view(
+            gym_id=self.other_gym.id
+        )
+
+        self.assertFalse(
+            CanViewEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    # ========================================================
+    # CanCreateEnrollment
+    # ========================================================
+
+    def test_owner_can_create_enrollment_for_user(self):
+        request = self.make_drf_request(
+            self.owner,
+            data={
+                "user_id": self.member.id,
+            },
+        )
+
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_manager_can_create_enrollment(self):
+        request = self.make_drf_request(
+            self.manager,
+            data={
+                "user_id": self.member.id,
+            },
+        )
+
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_staff_can_create_enrollment(self):
+        request = self.make_drf_request(
+            self.staff,
+            data={
+                "user_id": self.member.id,
+            },
+        )
+
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_member_can_create_enrollment_for_himself(self):
+        request = self.make_drf_request(
+            self.member,
+            data={
+                "user_id": self.member.id,
+            },
+        )
+
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_member_can_create_enrollment_without_user_id(self):
+        request = self.make_drf_request(
+            self.member,
+            data={},
+        )
+
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_member_cannot_create_enrollment_for_other_user(self):
+        request = self.make_drf_request(
+            self.member,
+            data={
+                "user_id": self.other_member.id,
+            },
+        )
+
+        view = self.make_view()
+
+        self.assertFalse(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_trainer_cannot_create_enrollment(self):
+        request = self.make_drf_request(
+            self.trainer,
+            data={
+                "user_id": self.member.id,
+            },
+        )
+
+        view = self.make_view()
+
+        self.assertFalse(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_superuser_can_create_enrollment(self):
+        request = self.make_drf_request(
+            self.superuser,
+            data={
+                "user_id": self.member.id,
+            },
+        )
+
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_create_enrollment_fails_for_nonexistent_user(self):
+        request = self.make_drf_request(
+            self.owner,
+            data={
+                "user_id": 999999,
+            },
+        )
+
+        view = self.make_view()
+
+        self.assertFalse(
+            CanCreateEnrollment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    # ========================================================
+    # CanManageEnrollment
+    # ========================================================
+
+    def test_owner_can_manage_enrollment(self):
+        request = self.make_request(self.owner)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanManageEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_manager_can_manage_enrollment(self):
+        request = self.make_request(self.manager)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanManageEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_staff_can_manage_enrollment(self):
+        request = self.make_request(self.staff)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanManageEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_trainer_cannot_manage_enrollment(self):
+        request = self.make_request(self.trainer)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanManageEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_member_cannot_manage_enrollment(self):
+        request = self.make_request(self.member)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanManageEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_superuser_can_manage_enrollment(self):
+        request = self.make_request(self.superuser)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanManageEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    # ========================================================
+    # CanCancelEnrollment
+    # ========================================================
+
+    def test_owner_can_cancel_enrollment(self):
+        request = self.make_request(self.owner)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCancelEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_manager_can_cancel_enrollment(self):
+        request = self.make_request(self.manager)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCancelEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_staff_can_cancel_enrollment(self):
+        request = self.make_request(self.staff)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCancelEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_member_can_cancel_his_own_enrollment(self):
+        request = self.make_request(self.member)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCancelEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_trainer_cannot_cancel_enrollment(self):
+        request = self.make_request(self.trainer)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanCancelEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+    def test_superuser_can_cancel_enrollment(self):
+        request = self.make_request(self.superuser)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCancelEnrollment().has_object_permission(
+                request,
+                view,
+                self.enrollment,
+            )
+        )
+
+
+# ============================================================
+# Payment Permission Tests
+# ============================================================
+
+class PaymentPermissionTest(TestCase):
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+        # ----------------------------------------------------
+        # Gyms
+        # ----------------------------------------------------
+
+        self.gym = Gym.objects.create(
+            name="Payment Gym",
+            address="Tehran",
+            phone="09223456789",
+            email="payment@gym.com",
+        )
+
+        self.other_gym = Gym.objects.create(
+            name="Other Payment Gym",
+            address="Tehran",
+            phone="09223456788",
+            email="otherpayment@gym.com",
+        )
+
+        # ----------------------------------------------------
+        # Users
+        # ----------------------------------------------------
+
+        self.owner = User.objects.create_user(
+            username="payment_owner",
+            password="Test1234",
+        )
+
+        self.manager = User.objects.create_user(
+            username="payment_manager",
+            password="Test1234",
+        )
+
+        self.staff = User.objects.create_user(
+            username="payment_staff",
+            password="Test1234",
+        )
+
+        self.trainer = User.objects.create_user(
+            username="payment_trainer",
+            password="Test1234",
+        )
+
+        self.member = User.objects.create_user(
+            username="payment_member",
+            password="Test1234",
+        )
+
+        self.superuser = User.objects.create_superuser(
+            username="payment_admin",
+            password="Test1234",
+        )
+
+        # ----------------------------------------------------
+        # Memberships
+        # ----------------------------------------------------
+
+        GymMembership.objects.create(
+            user=self.owner,
+            gym=self.gym,
+            role=GymMembership.Role.OWNER,
+            share_percentage=50,
+        )
+
+        GymMembership.objects.create(
+            user=self.manager,
+            gym=self.gym,
+            role=GymMembership.Role.MANAGER,
+            salary=1000,
+        )
+
+        GymMembership.objects.create(
+            user=self.staff,
+            gym=self.gym,
+            role=GymMembership.Role.STAFF,
+            salary=800,
+        )
+
+        GymMembership.objects.create(
+            user=self.trainer,
+            gym=self.gym,
+            role=GymMembership.Role.TRAINER,
+            salary=900,
+        )
+
+        GymMembership.objects.create(
+            user=self.member,
+            gym=self.gym,
+            role=GymMembership.Role.MEMBER,
+        )
+
+        # ----------------------------------------------------
+        # Gym Class
+        # ----------------------------------------------------
+
+        self.gym_class = GymClass.objects.create(
+            name="Payment Class",
+            gym=self.gym,
+            trainer=self.trainer,
+            start_date="2026-08-20",
+            end_date="2026-09-20",
+            start_time="10:00",
+            end_time="11:00",
+            capacity=20,
+            regular_days=["monday"],
+            price=1000,
+            single_session_price=100,
+        )
+
+        # ----------------------------------------------------
+        # Enrollment
+        # ----------------------------------------------------
+
+        self.enrollment = Enrollment.objects.create(
+            gym_class=self.gym_class,
+            user=self.member,
+            status="approved",
+            enrollment_type="semester",
+        )
+
+        # ----------------------------------------------------
+        # Payment
+        # ----------------------------------------------------
+
+        self.payment = Payment.objects.create(
+            enrollment=self.enrollment,
+            amount=1000,
+            status="pending",
+        )
+
+    # ========================================================
+    # Helpers
+    # ========================================================
+
+    def make_request(self, user):
+        request = self.factory.get(
+            "/api/gyms/{}/payments/".format(
+                self.gym.id
+            )
+        )
+
+        request.user = user
+
+        return request
+
+    def make_view(self, gym_id=None):
+        class MockView:
+            pass
+
+        view = MockView()
+
+        view.kwargs = {
+            "gym_id": gym_id or self.gym.id
+        }
+
+        return view
+
+    # ========================================================
+    # CanViewPayment
+    # ========================================================
+
+    def test_owner_can_view_payment(self):
+        request = self.make_request(self.owner)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanViewPayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_manager_can_view_payment(self):
+        request = self.make_request(self.manager)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanViewPayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_staff_can_view_payment(self):
+        request = self.make_request(self.staff)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanViewPayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_trainer_cannot_view_payment(self):
+        request = self.make_request(self.trainer)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanViewPayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_member_cannot_view_payment(self):
+        request = self.make_request(self.member)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanViewPayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_superuser_can_view_payment(self):
+        request = self.make_request(self.superuser)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanViewPayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    # ========================================================
+    # CanCreatePayment
+    # ========================================================
+
+    def test_owner_can_create_payment(self):
+        request = self.make_request(self.owner)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreatePayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_manager_can_create_payment(self):
+        request = self.make_request(self.manager)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreatePayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_staff_can_create_payment(self):
+        request = self.make_request(self.staff)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreatePayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_trainer_cannot_create_payment(self):
+        request = self.make_request(self.trainer)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanCreatePayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_member_cannot_create_payment(self):
+        request = self.make_request(self.member)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanCreatePayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    def test_superuser_can_create_payment(self):
+        request = self.make_request(self.superuser)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanCreatePayment().has_permission(
+                request,
+                view,
+            )
+        )
+
+    # ========================================================
+    # CanManagePayment
+    # ========================================================
+
+    def test_owner_can_manage_payment(self):
+        request = self.make_request(self.owner)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanManagePayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_manager_can_manage_payment(self):
+        request = self.make_request(self.manager)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanManagePayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_staff_can_manage_payment(self):
+        request = self.make_request(self.staff)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanManagePayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_trainer_cannot_manage_payment(self):
+        request = self.make_request(self.trainer)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanManagePayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_member_cannot_manage_payment(self):
+        request = self.make_request(self.member)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanManagePayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_superuser_can_manage_payment(self):
+        request = self.make_request(self.superuser)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanManagePayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    # ========================================================
+    # CanConfirmPayment
+    # ========================================================
+
+    def test_owner_can_confirm_payment(self):
+        request = self.make_request(self.owner)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanConfirmPayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_manager_can_confirm_payment(self):
+        request = self.make_request(self.manager)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanConfirmPayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_staff_can_confirm_payment(self):
+        request = self.make_request(self.staff)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanConfirmPayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_trainer_cannot_confirm_payment(self):
+        request = self.make_request(self.trainer)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanConfirmPayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_member_cannot_confirm_payment(self):
+        request = self.make_request(self.member)
+        view = self.make_view()
+
+        self.assertFalse(
+            CanConfirmPayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )
+
+    def test_superuser_can_confirm_payment(self):
+        request = self.make_request(self.superuser)
+        view = self.make_view()
+
+        self.assertTrue(
+            CanConfirmPayment().has_object_permission(
+                request,
+                view,
+                self.payment,
+            )
+        )

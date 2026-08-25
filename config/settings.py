@@ -50,7 +50,8 @@ INSTALLED_APPS = [
     'classes',
     'enrollments',
     'accounts',  
-    'reports'
+    'reports',
+    'permissions',
     ]
 
 
@@ -153,6 +154,7 @@ REST_FRAMEWORK = {
     ],
 }
 
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Gym Management API',
     'DESCRIPTION': 'API documentation for Gym Management System',
@@ -170,3 +172,11 @@ SIMPLE_JWT = {
 
     "UPDATE_LAST_LOGIN": True,
 }
+
+import sys
+
+
+if "test" in sys.argv:
+    PASSWORD_HASHERS = [
+        "django.contrib.auth.hashers.MD5PasswordHasher",
+    ]

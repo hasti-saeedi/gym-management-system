@@ -1,256 +1,101 @@
-from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
 from rest_framework.permissions import BasePermission
 
-from gyms.models import Gym
-from enrollments.models import Enrollment
+from permissions.base_permissions import GymPermission
+from permissions.permission_helpers import (
+    can_access_gym_payments,
+    can_manage_payment,
+    can_confirm_payment,
+    can_manage_enrollment,
+    can_create_enrollment,
+    can_cancel_enrollment,
+    can_access_gym_enrollments,
+)
 
-from permissions.class_permissions import is_staff_of_gym
+
+User = get_user_model()
 
 
-# =========================================================
-# Helper Functions
-# =========================================================
-
-
-def can_manage_enrollment(user, enrollment):
+class CanViewEnrollment(GymPermission):
     """
-    Check if user can view, update, or delete an enrollment.
-
-    Allowed:
-        - Superuser
-        - Owner
-        - Manager
-        - Staff of the same gym
-
-    Not allowed:
-        - Member
-        - Trainer
-        - Users from another gym
-    """
-
-    if user.is_superuser:
-        return True
-
-    gym = enrollment.gym_class.gym
-
-    return is_staff_of_gym(
-        user,
-        gym,
-    )
-
-
-def can_create_enrollment(
-    user,
-    gym,
-    target_user=None,
-):
-    """
-    Check if user can create an enrollment inside a gym.
-
-    Rules:
-
-    Member:
-        - Can create enrollment only for himself.
-
-    Owner / Manager / Staff:
-        - Can create enrollment for other users.
-        - Only inside their own gym.
-
-    Superuser:
-        - Always allowed.
-    """
-
-    if user.is_superuser:
-        return True
-
-    # Owner / Manager / Staff
-    if is_staff_of_gym(
-        user,
-        gym,
-    ):
-        return True
-
-    # Member can only enroll himself
-    return target_user == user
-
-
-def can_cancel_enrollment(user, enrollment):
-    """
-    Check if user can cancel an enrollment.
-
-    Allowed:
-        - Superuser
-        - Enrollment owner
-        - Owner of the gym
-        - Manager of the gym
-        - Staff of the gym
-
-    Not allowed:
-        - Other members
-        - Trainers
-        - Users from another gym
-    """
-
-    if user.is_superuser:
-        return True
-
-    # Member can cancel his own enrollment
-    if enrollment.user == user:
-        return True
-
-    gym = enrollment.gym_class.gym
-
-    # Owner / Manager / Staff of the same gym
-    return is_staff_of_gym(
-        user,
-        gym,
-    )
-
-
-# =========================================================
-# Enrollment Permissions
-# =========================================================
-
-
-class CanViewEnrollment(BasePermission):
-
-    """
-    Permission for viewing enrollments of a specific gym.
-
-    API:
-
-        GET
-        /api/enrollments/gyms/{gym_id}/enrollments/
-
-    Allowed:
-        - Superuser
-        - Owner
-        - Manager
-        - Staff of the same gym
-
-    Not allowed:
-        - Member
-        - Trainer
-        - Users from another gym
+    Allows Owner, Manager and Staff to view
+    enrollments belonging to a gym.
     """
 
     message = (
-        "You do not have permission to view enrollments for this gym."
+        "You do not have permission to view "
+        "enrollments for this gym."
     )
 
     def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
 
-        gym_id = view.kwargs.get("gym_id")
+        gym = self.get_gym(view)
 
-        # Gym must exist.
-        # If it does not exist -> 404
-        gym = get_object_or_404(
-            Gym,
-            id=gym_id,
-        )
-
-        if request.user.is_superuser:
-            return True
-
-        return is_staff_of_gym(
+        return can_access_gym_enrollments(
             request.user,
             gym,
         )
 
 
-class CanCreateEnrollment(BasePermission):
-
+class CanCreateEnrollment(GymPermission):
     """
-    Permission for creating an enrollment.
-
-    API:
-
-        POST
-        /api/enrollments/gyms/{gym_id}/enrollments/
-
-    Allowed:
+    Allows:
 
         Superuser:
-            - Always allowed.
+            Create enrollment for anyone.
 
         Owner / Manager / Staff:
-            - Can create enrollment for other users.
-            - Only inside their own gym.
+            Create enrollment for users in their gym.
 
         Member:
-            - Can create enrollment only for himself.
+            Create enrollment only for himself.
     """
 
     message = (
-        "You do not have permission to create an enrollment "
-        "for this gym."
+        "You do not have permission to create "
+        "an enrollment for this gym."
     )
 
     def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
 
-        gym_id = view.kwargs.get("gym_id")
+        gym = self.get_gym(view)
 
-        # Gym must exist.
-        # Invalid gym_id -> 404
-        gym = get_object_or_404(
-            Gym,
-            id=gym_id,
-        )
-
-        user = request.user
-
-        if user.is_superuser:
-            return True
-
-        # Owner / Manager / Staff
-        if is_staff_of_gym(
-            user,
-            gym,
-        ):
-            return True
-
-        # Member:
-        # If user_id is not sent, View will use request.user.
         target_user_id = request.data.get("user_id")
 
+        # If user_id is not provided,
+        # the serializer/service will use request.user.
         if target_user_id is None:
-            return True
+            target_user = request.user
 
-        # If user_id is provided, Member can only
-        # create enrollment for himself.
-        return str(target_user_id) == str(user.id)
+        else:
+            try:
+                target_user = User.objects.get(
+                    pk=target_user_id
+                )
+            except User.DoesNotExist:
+                return False
+
+        return can_create_enrollment(
+            request.user,
+            gym,
+            target_user,
+        )
 
 
 class CanManageEnrollment(BasePermission):
-
     """
-    Permission for managing an existing enrollment.
-
-    APIs:
-
-        GET
-        /api/enrollments/gyms/{gym_id}/enrollments/{id}/
-
-        PUT
-        /api/enrollments/gyms/{gym_id}/enrollments/{id}/
-
-        PATCH
-        /api/enrollments/gyms/{gym_id}/enrollments/{id}/
-
-        DELETE
-        /api/enrollments/gyms/{gym_id}/enrollments/{id}/
-
-    Allowed:
-        - Superuser
-        - Owner of the gym
-        - Manager of the gym
-        - Staff of the gym
-
-    Not allowed:
-        - Member
-        - Trainer
-        - Users from another gym
+    Allows Owner, Manager and Staff to manage
+    an existing enrollment.
     """
+
+    message = (
+        "You do not have permission to manage "
+        "this enrollment."
+    )
 
     def has_object_permission(
         self,
@@ -258,6 +103,9 @@ class CanManageEnrollment(BasePermission):
         view,
         obj,
     ):
+        if not request.user.is_authenticated:
+            return False
+
         return can_manage_enrollment(
             request.user,
             obj,
@@ -265,27 +113,22 @@ class CanManageEnrollment(BasePermission):
 
 
 class CanCancelEnrollment(BasePermission):
-
     """
-    Permission for cancelling an enrollment.
+    Allows:
 
-    API:
-
-        POST
-        /api/enrollments/gyms/{gym_id}/enrollments/{id}/cancel/
-
-    Allowed:
         - Superuser
         - Enrollment owner
-        - Owner of the gym
-        - Manager of the gym
-        - Staff of the gym
+        - Owner
+        - Manager
+        - Staff
 
-    Not allowed:
-        - Other members
-        - Trainers
-        - Users from another gym
+    to cancel an enrollment.
     """
+
+    message = (
+        "You do not have permission to cancel "
+        "this enrollment."
+    )
 
     def has_object_permission(
         self,
@@ -293,111 +136,31 @@ class CanCancelEnrollment(BasePermission):
         view,
         obj,
     ):
+        if not request.user.is_authenticated:
+            return False
+
         return can_cancel_enrollment(
             request.user,
             obj,
         )
-    
-from django.shortcuts import get_object_or_404
-from rest_framework.permissions import BasePermission
-
-from gyms.models import Gym
-from permissions.class_permissions import is_staff_of_gym
 
 
-# =========================================================
-# Helper Functions
-# =========================================================
-
-
-def can_access_gym_payments(user, gym):
+class CanViewPayment(GymPermission):
     """
-    Check if user can access payments of a gym.
-
-    Allowed:
-    - Superuser
-    - Owner
-    - Manager
-    - Staff of the same gym
+    Allows Owner, Manager and Staff to view
+    payments belonging to a gym.
     """
 
-    if user.is_superuser:
-        return True
-
-    return is_staff_of_gym(
-        user,
-        gym,
+    message = (
+        "You do not have permission to view "
+        "payments for this gym."
     )
-
-
-def can_manage_payment(user, payment):
-    """
-    Check if user can retrieve, update, or delete a payment.
-
-    Allowed:
-    - Superuser
-    - Owner
-    - Manager
-    - Staff of the same gym
-
-    Not allowed:
-    - Member
-    - Trainer
-    - Users from another gym
-    """
-
-    if user.is_superuser:
-        return True
-
-    gym = payment.enrollment.gym_class.gym
-
-    return is_staff_of_gym(
-        user,
-        gym,
-    )
-
-
-def can_confirm_payment(user, payment):
-    """
-    Check if user can confirm a payment.
-
-    Allowed:
-    - Superuser
-    - Owner
-    - Manager
-    - Staff of the same gym
-    """
-
-    if user.is_superuser:
-        return True
-
-    gym = payment.enrollment.gym_class.gym
-
-    return is_staff_of_gym(
-        user,
-        gym,
-    )
-
-
-# =========================================================
-# Base Permission
-# =========================================================
-
-
-class CanAccessGymPayment(BasePermission):
-    """
-    Base permission for payment APIs that use gym_id
-    in the URL.
-    """
 
     def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
 
-        gym_id = view.kwargs.get("gym_id")
-
-        gym = get_object_or_404(
-            Gym,
-            id=gym_id,
-        )
+        gym = self.get_gym(view)
 
         return can_access_gym_payments(
             request.user,
@@ -405,28 +168,34 @@ class CanAccessGymPayment(BasePermission):
         )
 
 
-# =========================================================
-# Payment Permissions
-# =========================================================
-
-
-class CanViewPayment(CanAccessGymPayment):
-
-    message = (
-        "You do not have permission to view payments "
-        "for this gym."
-    )
-
-
-class CanCreatePayment(CanAccessGymPayment):
+class CanCreatePayment(GymPermission):
+    """
+    Allows Owner, Manager and Staff to create
+    payments inside a gym.
+    """
 
     message = (
-        "You do not have permission to create payments "
-        "for this gym."
+        "You do not have permission to create "
+        "payments for this gym."
     )
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        gym = self.get_gym(view)
+
+        return can_access_gym_payments(
+            request.user,
+            gym,
+        )
 
 
 class CanManagePayment(BasePermission):
+    """
+    Allows Owner, Manager and Staff to manage
+    an existing payment.
+    """
 
     message = (
         "You do not have permission to manage "
@@ -439,6 +208,8 @@ class CanManagePayment(BasePermission):
         view,
         obj,
     ):
+        if not request.user.is_authenticated:
+            return False
 
         return can_manage_payment(
             request.user,
@@ -447,6 +218,10 @@ class CanManagePayment(BasePermission):
 
 
 class CanConfirmPayment(BasePermission):
+    """
+    Allows Owner, Manager and Staff to confirm
+    an existing payment.
+    """
 
     message = (
         "You do not have permission to confirm "
@@ -459,6 +234,8 @@ class CanConfirmPayment(BasePermission):
         view,
         obj,
     ):
+        if not request.user.is_authenticated:
+            return False
 
         return can_confirm_payment(
             request.user,

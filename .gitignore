@@ -34,3 +34,7 @@ htmlcov/
 # Django static/media
 staticfiles/
 media/
+
+
+notice.txt
+myplan.txt

@@ -12,8 +12,8 @@ from rest_framework.permissions import (
     IsAuthenticated,
     AllowAny,
 )
+from permissions.base_permissions import IsAnonymous
 
-from permissions.permission_helpers import IsAnonymous
 
 from .serializers import (
     CustomUserSerializer,
