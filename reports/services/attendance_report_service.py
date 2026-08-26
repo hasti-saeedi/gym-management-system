@@ -12,7 +12,8 @@ def get_attendance_statistics(gym_id):
     pk=gym_id,
 )
     queryset = ClassSession.objects.filter(
-        gym_class__gym_id=gym
+        # gym_class__gym_id=gym
+        gym_class__gym_id=gym_id
     )
 
     total_sessions = queryset.count()
@@ -41,7 +42,8 @@ def get_today_sessions(gym_id):
     today = timezone.localdate()
 
     queryset = ClassSession.objects.filter(
-        gym_class__gym_id=gym,
+        # gym_class__gym_id=gym,
+        gym_class__gym_id=gym_id,
         start_time__date=today,
     ).order_by("start_time")
 
@@ -54,7 +56,8 @@ def get_cancelled_sessions(gym_id):
     pk=gym_id,
 )
     queryset = ClassSession.objects.filter(
-        gym_class__gym_id=gym,
+        # gym_class__gym_id=gym,
+        gym_class__gym_id=gym_id,
         is_cancelled=True,
     ).order_by("-start_time")
 
