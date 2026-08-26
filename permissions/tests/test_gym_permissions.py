@@ -1,30 +1,27 @@
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
-from rest_framework.exceptions import NotAuthenticated
 
 from accounts.models import CustomUser
 from gyms.models import Gym, GymMembership
 
 from permissions.gym_permissions import (
-    CanViewGym,
-    CanCreateGym,
-    CanManageGym,
     CanAddStaff,
+    CanCreateGym,
+    CanCreateGymMembership,
+    CanManageGym,
+    CanManageGymMembership,
+    CanViewGym,
     CanViewGymMembers,
     CanViewGymMembership,
-    CanCreateGymMembership,
-    CanManageGymMembership,
 )
 
 
 class GymPermissionsTestCase(TestCase):
+    """Test permissions related to gyms and gym memberships."""
 
     def setUp(self):
+        """Create users, gyms, memberships, and mock views for testing."""
         self.factory = APIRequestFactory()
-
-        # =====================================================
-        # Users
-        # =====================================================
 
         self.owner = CustomUser.objects.create_user(
             username="owner",
@@ -56,10 +53,6 @@ class GymPermissionsTestCase(TestCase):
             password="Test1234",
         )
 
-        # =====================================================
-        # Gym
-        # =====================================================
-
         self.gym = Gym.objects.create(
             name="Test Gym",
             address="Tehran",
@@ -69,10 +62,6 @@ class GymPermissionsTestCase(TestCase):
             name="Other Gym",
             address="Other Address",
         )
-
-        # =====================================================
-        # Memberships
-        # =====================================================
 
         GymMembership.objects.create(
             user=self.owner,
@@ -113,10 +102,6 @@ class GymPermissionsTestCase(TestCase):
             is_active=True,
         )
 
-        # =====================================================
-        # Views
-        # =====================================================
-
         self.view = type(
             "View",
             (),
@@ -137,11 +122,10 @@ class GymPermissionsTestCase(TestCase):
             },
         )()
 
-    # =========================================================
     # CanViewGym
-    # =========================================================
 
     def test_view_gym_allows_unauthenticated(self):
+        """Allow unauthenticated users to view a gym."""
         request = self.factory.get("/")
 
         permission = CanViewGym()
@@ -154,6 +138,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_gym_allows_authenticated(self):
+        """Allow authenticated users to view a gym."""
         request = self.factory.get("/")
         request.user = self.member
 
@@ -166,11 +151,10 @@ class GymPermissionsTestCase(TestCase):
             )
         )
 
-    # =========================================================
     # CanCreateGym
-    # =========================================================
 
     def test_create_gym_allows_superuser(self):
+        """Allow superusers to create gyms."""
         request = self.factory.post("/")
         request.user = self.superuser
 
@@ -184,6 +168,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_create_gym_denies_owner(self):
+        """Deny gym owners from creating gyms."""
         request = self.factory.post("/")
         request.user = self.owner
 
@@ -197,6 +182,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_create_gym_denies_manager(self):
+        """Deny gym managers from creating gyms."""
         request = self.factory.post("/")
         request.user = self.manager
 
@@ -210,6 +196,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_create_gym_denies_member(self):
+        """Deny gym members from creating gyms."""
         request = self.factory.post("/")
         request.user = self.member
 
@@ -222,11 +209,10 @@ class GymPermissionsTestCase(TestCase):
             )
         )
 
-    # =========================================================
     # CanManageGym
-    # =========================================================
 
     def test_manage_gym_allows_superuser(self):
+        """Allow superusers to manage any gym."""
         request = self.factory.patch("/")
         request.user = self.superuser
 
@@ -241,6 +227,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_allows_owner(self):
+        """Allow gym owners to manage their gym."""
         request = self.factory.patch("/")
         request.user = self.owner
 
@@ -255,6 +242,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_allows_manager(self):
+        """Allow gym managers to manage their gym."""
         request = self.factory.patch("/")
         request.user = self.manager
 
@@ -269,6 +257,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_denies_staff(self):
+        """Deny staff members from managing a gym."""
         request = self.factory.patch("/")
         request.user = self.staff
 
@@ -283,6 +272,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_denies_trainer(self):
+        """Deny trainers from managing a gym."""
         request = self.factory.patch("/")
         request.user = self.trainer
 
@@ -297,6 +287,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_denies_member(self):
+        """Deny members from managing a gym."""
         request = self.factory.patch("/")
         request.user = self.member
 
@@ -311,6 +302,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_denies_user_from_other_gym(self):
+        """Deny users from managing a gym they do not belong to."""
         request = self.factory.patch("/")
         request.user = self.owner
 
@@ -324,11 +316,10 @@ class GymPermissionsTestCase(TestCase):
             )
         )
 
-    # =========================================================
     # CanAddStaff
-    # =========================================================
 
     def test_add_staff_allows_superuser(self):
+        """Allow superusers to add staff to a gym."""
         request = self.factory.post("/")
         request.user = self.superuser
 
@@ -342,6 +333,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_add_staff_allows_owner(self):
+        """Allow gym owners to add staff."""
         request = self.factory.post("/")
         request.user = self.owner
 
@@ -355,6 +347,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_add_staff_allows_manager(self):
+        """Allow gym managers to add staff."""
         request = self.factory.post("/")
         request.user = self.manager
 
@@ -368,6 +361,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_add_staff_denies_staff(self):
+        """Deny staff members from adding other staff."""
         request = self.factory.post("/")
         request.user = self.staff
 
@@ -381,6 +375,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_add_staff_denies_trainer(self):
+        """Deny trainers from adding staff."""
         request = self.factory.post("/")
         request.user = self.trainer
 
@@ -394,6 +389,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_add_staff_denies_member(self):
+        """Deny members from adding staff."""
         request = self.factory.post("/")
         request.user = self.member
 
@@ -406,11 +402,10 @@ class GymPermissionsTestCase(TestCase):
             )
         )
 
-    # =========================================================
     # CanViewGymMembers
-    # =========================================================
 
     def test_view_gym_members_allows_superuser(self):
+        """Allow superusers to view gym members."""
         request = self.factory.get("/")
         request.user = self.superuser
 
@@ -424,6 +419,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_gym_members_allows_owner(self):
+        """Allow gym owners to view gym members."""
         request = self.factory.get("/")
         request.user = self.owner
 
@@ -437,6 +433,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_gym_members_allows_manager(self):
+        """Allow gym managers to view gym members."""
         request = self.factory.get("/")
         request.user = self.manager
 
@@ -450,6 +447,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_gym_members_allows_staff(self):
+        """Allow staff members to view gym members."""
         request = self.factory.get("/")
         request.user = self.staff
 
@@ -463,6 +461,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_gym_members_denies_trainer(self):
+        """Deny trainers from viewing gym members."""
         request = self.factory.get("/")
         request.user = self.trainer
 
@@ -476,6 +475,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_gym_members_denies_member(self):
+        """Deny members from viewing other gym members."""
         request = self.factory.get("/")
         request.user = self.member
 
@@ -488,11 +488,10 @@ class GymPermissionsTestCase(TestCase):
             )
         )
 
-    # =========================================================
     # CanViewGymMembership
-    # =========================================================
 
     def test_view_membership_allows_superuser(self):
+        """Allow superusers to view gym memberships."""
         request = self.factory.get("/")
         request.user = self.superuser
 
@@ -506,6 +505,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_membership_allows_owner(self):
+        """Allow gym owners to view memberships."""
         request = self.factory.get("/")
         request.user = self.owner
 
@@ -519,6 +519,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_membership_allows_manager(self):
+        """Allow gym managers to view memberships."""
         request = self.factory.get("/")
         request.user = self.manager
 
@@ -532,6 +533,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_membership_denies_staff(self):
+        """Deny staff members from viewing gym memberships."""
         request = self.factory.get("/")
         request.user = self.staff
 
@@ -545,6 +547,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_view_membership_denies_member(self):
+        """Deny members from viewing gym memberships."""
         request = self.factory.get("/")
         request.user = self.member
 
@@ -557,11 +560,10 @@ class GymPermissionsTestCase(TestCase):
             )
         )
 
-    # =========================================================
     # CanCreateGymMembership
-    # =========================================================
 
     def test_create_membership_allows_superuser(self):
+        """Allow superusers to create gym memberships."""
         request = self.factory.post("/")
         request.user = self.superuser
 
@@ -575,6 +577,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_create_membership_allows_owner(self):
+        """Allow gym owners to create memberships."""
         request = self.factory.post("/")
         request.user = self.owner
 
@@ -588,6 +591,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_create_membership_allows_manager(self):
+        """Allow gym managers to create memberships."""
         request = self.factory.post("/")
         request.user = self.manager
 
@@ -601,6 +605,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_create_membership_denies_staff(self):
+        """Deny staff members from creating gym memberships."""
         request = self.factory.post("/")
         request.user = self.staff
 
@@ -614,6 +619,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_create_membership_denies_member(self):
+        """Deny members from creating gym memberships."""
         request = self.factory.post("/")
         request.user = self.member
 
@@ -626,11 +632,10 @@ class GymPermissionsTestCase(TestCase):
             )
         )
 
-    # =========================================================
     # CanManageGymMembership
-    # =========================================================
 
     def test_manage_membership_allows_superuser(self):
+        """Allow superusers to manage gym memberships."""
         membership = GymMembership.objects.get(
             user=self.member,
             gym=self.gym,
@@ -650,6 +655,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_membership_allows_owner(self):
+        """Allow gym owners to manage memberships."""
         membership = GymMembership.objects.get(
             user=self.member,
             gym=self.gym,
@@ -669,6 +675,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_membership_allows_manager(self):
+        """Allow gym managers to manage memberships."""
         membership = GymMembership.objects.get(
             user=self.member,
             gym=self.gym,
@@ -688,6 +695,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_membership_denies_staff(self):
+        """Deny staff members from managing gym memberships."""
         membership = GymMembership.objects.get(
             user=self.member,
             gym=self.gym,
@@ -707,6 +715,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_membership_denies_trainer(self):
+        """Deny trainers from managing gym memberships."""
         membership = GymMembership.objects.get(
             user=self.member,
             gym=self.gym,
@@ -726,6 +735,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_membership_denies_member(self):
+        """Deny members from managing their own or other memberships."""
         membership = GymMembership.objects.get(
             user=self.member,
             gym=self.gym,
@@ -745,6 +755,7 @@ class GymPermissionsTestCase(TestCase):
         )
 
     def test_manage_membership_denies_membership_from_other_gym(self):
+        """Deny users from managing memberships belonging to another gym."""
         other_membership = GymMembership.objects.create(
             user=self.member,
             gym=self.other_gym,

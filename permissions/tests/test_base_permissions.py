@@ -5,17 +5,31 @@ from accounts.models import CustomUser
 from gyms.models import Gym
 
 from permissions.base_permissions import (
-    IsAnonymous,
     AuthenticatedPermission,
     GymPermission,
+    IsAnonymous,
 )
 
 
 class BasePermissionsTestCase(TestCase):
+    """
+    Test base permission classes used throughout the project.
+
+    The tests cover:
+
+    - Anonymous user access.
+    - Authenticated user access.
+    - Retrieving a Gym from the URL.
+    - Handling invalid Gym IDs.
+    - Detecting superusers.
+    """
 
     def setUp(self):
+        """Create test users, a gym, and a mock view."""
+
         self.factory = APIRequestFactory()
 
+        # Users
         self.user = CustomUser.objects.create_user(
             username="testuser",
             password="Test1234",
@@ -26,10 +40,12 @@ class BasePermissionsTestCase(TestCase):
             password="Test1234",
         )
 
+        # Gym
         self.gym = Gym.objects.create(
             name="Test Gym",
         )
 
+        # Mock view containing gym_id in URL kwargs
         self.view = type(
             "View",
             (),
@@ -45,14 +61,13 @@ class BasePermissionsTestCase(TestCase):
     # =========================================================
 
     def test_is_anonymous_allows_unauthenticated_user(self):
-        request = self.factory.get("/")
+        """IsAnonymous allows unauthenticated users."""
 
+        request = self.factory.get("/")
         request.user = type(
             "AnonymousUser",
             (),
-            {
-                "is_authenticated": False,
-            },
+            {"is_authenticated": False},
         )()
 
         permission = IsAnonymous()
@@ -65,6 +80,8 @@ class BasePermissionsTestCase(TestCase):
         )
 
     def test_is_anonymous_denies_authenticated_user(self):
+        """IsAnonymous denies authenticated users."""
+
         request = self.factory.get("/")
         request.user = self.user
 
@@ -82,6 +99,8 @@ class BasePermissionsTestCase(TestCase):
     # =========================================================
 
     def test_authenticated_permission_allows_authenticated_user(self):
+        """AuthenticatedPermission allows authenticated users."""
+
         request = self.factory.get("/")
         request.user = self.user
 
@@ -95,14 +114,13 @@ class BasePermissionsTestCase(TestCase):
         )
 
     def test_authenticated_permission_denies_unauthenticated_user(self):
-        request = self.factory.get("/")
+        """AuthenticatedPermission denies unauthenticated users."""
 
+        request = self.factory.get("/")
         request.user = type(
             "AnonymousUser",
             (),
-            {
-                "is_authenticated": False,
-            },
+            {"is_authenticated": False},
         )()
 
         permission = AuthenticatedPermission()
@@ -119,11 +137,11 @@ class BasePermissionsTestCase(TestCase):
     # =========================================================
 
     def test_get_gym_returns_correct_gym(self):
+        """get_gym returns the Gym specified in the URL."""
+
         permission = GymPermission()
 
-        result = permission.get_gym(
-            self.view
-        )
+        result = permission.get_gym(self.view)
 
         self.assertEqual(
             result,
@@ -131,14 +149,14 @@ class BasePermissionsTestCase(TestCase):
         )
 
     def test_get_gym_raises_404_for_invalid_gym_id(self):
+        """get_gym raises Http404 when the Gym does not exist."""
+
         permission = GymPermission()
 
         self.view.kwargs["gym_id"] = 999999
 
         with self.assertRaises(Exception) as context:
-            permission.get_gym(
-                self.view
-            )
+            permission.get_gym(self.view)
 
         self.assertEqual(
             context.exception.__class__.__name__,
@@ -150,32 +168,33 @@ class BasePermissionsTestCase(TestCase):
     # =========================================================
 
     def test_is_superuser_returns_true_for_superuser(self):
+        """is_superuser returns True for a superuser."""
+
         request = self.factory.get("/")
         request.user = self.superuser
 
         permission = GymPermission()
 
         self.assertTrue(
-            permission.is_superuser(
-                request
-            )
+            permission.is_superuser(request)
         )
 
     def test_is_superuser_returns_false_for_normal_user(self):
+        """is_superuser returns False for a regular user."""
+
         request = self.factory.get("/")
         request.user = self.user
 
         permission = GymPermission()
 
         self.assertFalse(
-            permission.is_superuser(
-                request
-            )
+            permission.is_superuser(request)
         )
 
     def test_is_superuser_returns_false_for_unauthenticated_user(self):
-        request = self.factory.get("/")
+        """is_superuser returns False for an unauthenticated user."""
 
+        request = self.factory.get("/")
         request.user = type(
             "AnonymousUser",
             (),
@@ -188,7 +207,5 @@ class BasePermissionsTestCase(TestCase):
         permission = GymPermission()
 
         self.assertFalse(
-            permission.is_superuser(
-                request
-            )
+            permission.is_superuser(request)
         )

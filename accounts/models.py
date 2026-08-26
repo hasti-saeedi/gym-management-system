@@ -1,9 +1,15 @@
 from django.contrib.auth.models import AbstractUser
-from django.db import models
 from django.core.validators import RegexValidator
+from django.db import models
 
 
 class CustomUser(AbstractUser):
+    """
+    Custom user model extending Django's AbstractUser.
+
+    Adds additional fields for storing the user's phone number,
+    address, and last update timestamp.
+    """
 
     phone = models.CharField(
         max_length=11,
@@ -20,8 +26,11 @@ class CustomUser(AbstractUser):
     )
 
     address = models.TextField(blank=True)
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='last updated')
 
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='last updated'
+    )
 
     class Meta:
         verbose_name = 'user'
@@ -29,7 +38,10 @@ class CustomUser(AbstractUser):
         ordering = ['first_name', 'last_name']
 
     def __str__(self):
-        return self.get_full_name() or self.username
-    
-    
+        """
+        Return the user's full name or username.
 
+        Returns:
+            str: The user's full name if available; otherwise, the username.
+        """
+        return self.get_full_name() or self.username

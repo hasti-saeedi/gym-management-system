@@ -1,42 +1,40 @@
-from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.test import TestCase
 
-from rest_framework.test import APIRequestFactory
-from rest_framework.request import Request
 from rest_framework.parsers import JSONParser
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory
 
-from gyms.models import Gym, GymMembership
 from classes.models import GymClass
 from enrollments.models import Enrollment, Payment
+from gyms.models import Gym, GymMembership
 
 from permissions.enrollment_permissions import (
-    CanViewEnrollment,
+    CanCancelEnrollment,
     CanCreateEnrollment,
     CanManageEnrollment,
-    CanCancelEnrollment,
-    CanViewPayment,
+    CanViewEnrollment,
+    CanConfirmPayment,
     CanCreatePayment,
     CanManagePayment,
-    CanConfirmPayment,
+    CanViewPayment,
 )
 
 
 User = get_user_model()
 
 
-# ============================================================
-# Enrollment Permission Tests
-# ============================================================
-
 class EnrollmentPermissionTest(TestCase):
+    """Test permissions related to gym class enrollments."""
 
     def setUp(self):
+        """Create users, memberships, gym class, and enrollment fixtures."""
         self.factory = APIRequestFactory()
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Gyms
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.gym = Gym.objects.create(
             name="Test Gym",
@@ -52,9 +50,9 @@ class EnrollmentPermissionTest(TestCase):
             email="other@test.com",
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Users
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.owner = User.objects.create_user(
             username="owner",
@@ -91,9 +89,9 @@ class EnrollmentPermissionTest(TestCase):
             password="Test1234",
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Memberships
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         GymMembership.objects.create(
             user=self.owner,
@@ -135,9 +133,9 @@ class EnrollmentPermissionTest(TestCase):
             role=GymMembership.Role.MEMBER,
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Gym Class
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.gym_class = GymClass.objects.create(
             name="Python Class",
@@ -153,9 +151,9 @@ class EnrollmentPermissionTest(TestCase):
             single_session_price=100,
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Enrollment
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.enrollment = Enrollment.objects.create(
             gym_class=self.gym_class,
@@ -164,31 +162,20 @@ class EnrollmentPermissionTest(TestCase):
             enrollment_type="semester",
         )
 
-        # ----------------------------------------------------
-        # Payment
-        # ----------------------------------------------------
+    def make_request(self, user, method="get", data=None):
+        """
+        Create a basic Django test request for permission testing.
 
-        self.payment = Payment.objects.create(
-            enrollment=self.enrollment,
-            amount=1000,
-            status="pending",
-        )
+        Args:
+            user: User assigned to the request.
+            method: HTTP method used to create the request.
+            data: Optional request payload.
 
-    # ========================================================
-    # Helpers
-    # ========================================================
-
-    def make_request(
-        self,
-        user,
-        method="get",
-        data=None,
-    ):
-        request = getattr(
-            self.factory,
-            method,
-        )(
-            "/api/gyms/{}/enrollments/".format(self.gym.id),
+        Returns:
+            HttpRequest: Configured test request.
+        """
+        request = getattr(self.factory, method)(
+            f"/api/gyms/{self.gym.id}/enrollments/",
             data=data or {},
             format="json",
         )
@@ -197,17 +184,15 @@ class EnrollmentPermissionTest(TestCase):
 
         return request
 
-    def make_drf_request(
-        self,
-        user,
-        method="post",
-        data=None,
-    ):
-        request = getattr(
-            self.factory,
-            method,
-        )(
-            "/api/gyms/{}/enrollments/".format(self.gym.id),
+    def make_drf_request(self, user, method="post", data=None):
+        """
+        Create a DRF Request object with JSON parsing support.
+
+        This helper is useful when the permission class accesses
+        request.data directly.
+        """
+        request = getattr(self.factory, method)(
+            f"/api/gyms/{self.gym.id}/enrollments/",
             data=data or {},
             format="json",
         )
@@ -222,22 +207,35 @@ class EnrollmentPermissionTest(TestCase):
         return request
 
     def make_view(self, gym_id=None):
+        """
+        Create a minimal mock view containing the requested gym ID.
+
+        Args:
+            gym_id: Gym ID that should be available in view.kwargs.
+
+        Returns:
+            MockView: Minimal view object for permission testing.
+        """
+
         class MockView:
+            """Minimal view object used by permission tests."""
+
             pass
 
         view = MockView()
 
         view.kwargs = {
-            "gym_id": gym_id or self.gym.id
+            "gym_id": gym_id or self.gym.id,
         }
 
         return view
 
-    # ========================================================
+    # ==================================================
     # CanViewEnrollment
-    # ========================================================
+    # ==================================================
 
     def test_owner_can_view_enrollments(self):
+        """Owners can view enrollments of their gym."""
         request = self.make_request(self.owner)
         view = self.make_view()
 
@@ -249,6 +247,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_manager_can_view_enrollments(self):
+        """Managers can view enrollments of their gym."""
         request = self.make_request(self.manager)
         view = self.make_view()
 
@@ -260,6 +259,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_staff_can_view_enrollments(self):
+        """Staff members can view enrollments of their gym."""
         request = self.make_request(self.staff)
         view = self.make_view()
 
@@ -271,6 +271,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_trainer_cannot_view_enrollments(self):
+        """Trainers cannot view gym enrollments."""
         request = self.make_request(self.trainer)
         view = self.make_view()
 
@@ -282,6 +283,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_member_cannot_view_enrollments(self):
+        """Members cannot view all gym enrollments."""
         request = self.make_request(self.member)
         view = self.make_view()
 
@@ -293,6 +295,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_unauthenticated_user_cannot_view_enrollments(self):
+        """Unauthenticated users cannot view gym enrollments."""
         request = self.make_request(self.member)
         request.user = AnonymousUser()
 
@@ -306,6 +309,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_superuser_can_view_enrollments(self):
+        """Superusers can view enrollments regardless of gym membership."""
         request = self.make_request(self.superuser)
         view = self.make_view()
 
@@ -317,10 +321,11 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_user_cannot_view_enrollments_of_other_gym(self):
+        """Users cannot view enrollments belonging to another gym."""
         request = self.make_request(self.owner)
 
         view = self.make_view(
-            gym_id=self.other_gym.id
+            gym_id=self.other_gym.id,
         )
 
         self.assertFalse(
@@ -330,16 +335,15 @@ class EnrollmentPermissionTest(TestCase):
             )
         )
 
-    # ========================================================
+    # ==================================================
     # CanCreateEnrollment
-    # ========================================================
+    # ==================================================
 
     def test_owner_can_create_enrollment_for_user(self):
+        """Owners can create enrollments for gym users."""
         request = self.make_drf_request(
             self.owner,
-            data={
-                "user_id": self.member.id,
-            },
+            data={"user_id": self.member.id},
         )
 
         view = self.make_view()
@@ -352,11 +356,10 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_manager_can_create_enrollment(self):
+        """Managers can create enrollments."""
         request = self.make_drf_request(
             self.manager,
-            data={
-                "user_id": self.member.id,
-            },
+            data={"user_id": self.member.id},
         )
 
         view = self.make_view()
@@ -369,11 +372,10 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_staff_can_create_enrollment(self):
+        """Staff members can create enrollments."""
         request = self.make_drf_request(
             self.staff,
-            data={
-                "user_id": self.member.id,
-            },
+            data={"user_id": self.member.id},
         )
 
         view = self.make_view()
@@ -386,11 +388,10 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_member_can_create_enrollment_for_himself(self):
+        """Members can create an enrollment for themselves."""
         request = self.make_drf_request(
             self.member,
-            data={
-                "user_id": self.member.id,
-            },
+            data={"user_id": self.member.id},
         )
 
         view = self.make_view()
@@ -403,6 +404,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_member_can_create_enrollment_without_user_id(self):
+        """Members can create an enrollment without specifying a user ID."""
         request = self.make_drf_request(
             self.member,
             data={},
@@ -418,11 +420,10 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_member_cannot_create_enrollment_for_other_user(self):
+        """Members cannot create enrollments for other users."""
         request = self.make_drf_request(
             self.member,
-            data={
-                "user_id": self.other_member.id,
-            },
+            data={"user_id": self.other_member.id},
         )
 
         view = self.make_view()
@@ -435,11 +436,10 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_trainer_cannot_create_enrollment(self):
+        """Trainers cannot create enrollments."""
         request = self.make_drf_request(
             self.trainer,
-            data={
-                "user_id": self.member.id,
-            },
+            data={"user_id": self.member.id},
         )
 
         view = self.make_view()
@@ -452,11 +452,10 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_superuser_can_create_enrollment(self):
+        """Superusers can create enrollments."""
         request = self.make_drf_request(
             self.superuser,
-            data={
-                "user_id": self.member.id,
-            },
+            data={"user_id": self.member.id},
         )
 
         view = self.make_view()
@@ -469,11 +468,10 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_create_enrollment_fails_for_nonexistent_user(self):
+        """Enrollment creation is denied for a nonexistent user."""
         request = self.make_drf_request(
             self.owner,
-            data={
-                "user_id": 999999,
-            },
+            data={"user_id": 999999},
         )
 
         view = self.make_view()
@@ -485,11 +483,12 @@ class EnrollmentPermissionTest(TestCase):
             )
         )
 
-    # ========================================================
+    # ==================================================
     # CanManageEnrollment
-    # ========================================================
+    # ==================================================
 
     def test_owner_can_manage_enrollment(self):
+        """Owners can manage enrollments."""
         request = self.make_request(self.owner)
         view = self.make_view()
 
@@ -502,6 +501,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_manager_can_manage_enrollment(self):
+        """Managers can manage enrollments."""
         request = self.make_request(self.manager)
         view = self.make_view()
 
@@ -514,6 +514,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_staff_can_manage_enrollment(self):
+        """Staff members can manage enrollments."""
         request = self.make_request(self.staff)
         view = self.make_view()
 
@@ -526,6 +527,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_trainer_cannot_manage_enrollment(self):
+        """Trainers cannot manage enrollments."""
         request = self.make_request(self.trainer)
         view = self.make_view()
 
@@ -538,6 +540,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_member_cannot_manage_enrollment(self):
+        """Members cannot manage enrollments."""
         request = self.make_request(self.member)
         view = self.make_view()
 
@@ -550,6 +553,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_superuser_can_manage_enrollment(self):
+        """Superusers can manage enrollments."""
         request = self.make_request(self.superuser)
         view = self.make_view()
 
@@ -561,11 +565,12 @@ class EnrollmentPermissionTest(TestCase):
             )
         )
 
-    # ========================================================
+    # ==================================================
     # CanCancelEnrollment
-    # ========================================================
+    # ==================================================
 
     def test_owner_can_cancel_enrollment(self):
+        """Owners can cancel enrollments."""
         request = self.make_request(self.owner)
         view = self.make_view()
 
@@ -578,6 +583,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_manager_can_cancel_enrollment(self):
+        """Managers can cancel enrollments."""
         request = self.make_request(self.manager)
         view = self.make_view()
 
@@ -590,6 +596,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_staff_can_cancel_enrollment(self):
+        """Staff members can cancel enrollments."""
         request = self.make_request(self.staff)
         view = self.make_view()
 
@@ -602,6 +609,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_member_can_cancel_his_own_enrollment(self):
+        """Members can cancel their own enrollments."""
         request = self.make_request(self.member)
         view = self.make_view()
 
@@ -614,6 +622,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_trainer_cannot_cancel_enrollment(self):
+        """Trainers cannot cancel enrollments."""
         request = self.make_request(self.trainer)
         view = self.make_view()
 
@@ -626,6 +635,7 @@ class EnrollmentPermissionTest(TestCase):
         )
 
     def test_superuser_can_cancel_enrollment(self):
+        """Superusers can cancel enrollments."""
         request = self.make_request(self.superuser)
         view = self.make_view()
 
@@ -638,18 +648,16 @@ class EnrollmentPermissionTest(TestCase):
         )
 
 
-# ============================================================
-# Payment Permission Tests
-# ============================================================
-
 class PaymentPermissionTest(TestCase):
+    """Test permissions related to payment management."""
 
     def setUp(self):
+        """Create users, memberships, enrollment, and payment fixtures."""
         self.factory = APIRequestFactory()
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Gyms
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.gym = Gym.objects.create(
             name="Payment Gym",
@@ -665,9 +673,9 @@ class PaymentPermissionTest(TestCase):
             email="otherpayment@gym.com",
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Users
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.owner = User.objects.create_user(
             username="payment_owner",
@@ -699,9 +707,9 @@ class PaymentPermissionTest(TestCase):
             password="Test1234",
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Memberships
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         GymMembership.objects.create(
             user=self.owner,
@@ -737,9 +745,9 @@ class PaymentPermissionTest(TestCase):
             role=GymMembership.Role.MEMBER,
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Gym Class
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.gym_class = GymClass.objects.create(
             name="Payment Class",
@@ -755,9 +763,9 @@ class PaymentPermissionTest(TestCase):
             single_session_price=100,
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Enrollment
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.enrollment = Enrollment.objects.create(
             gym_class=self.gym_class,
@@ -766,9 +774,9 @@ class PaymentPermissionTest(TestCase):
             enrollment_type="semester",
         )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Payment
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         self.payment = Payment.objects.create(
             enrollment=self.enrollment,
@@ -776,15 +784,10 @@ class PaymentPermissionTest(TestCase):
             status="pending",
         )
 
-    # ========================================================
-    # Helpers
-    # ========================================================
-
     def make_request(self, user):
+        """Create a GET request for payment permission tests."""
         request = self.factory.get(
-            "/api/gyms/{}/payments/".format(
-                self.gym.id
-            )
+            f"/api/gyms/{self.gym.id}/payments/",
         )
 
         request.user = user
@@ -792,22 +795,35 @@ class PaymentPermissionTest(TestCase):
         return request
 
     def make_view(self, gym_id=None):
+        """
+        Create a minimal mock view containing the requested gym ID.
+
+        Args:
+            gym_id: Gym ID that should be available in view.kwargs.
+
+        Returns:
+            MockView: Minimal view object for permission testing.
+        """
+
         class MockView:
+            """Minimal view object used by payment permission tests."""
+
             pass
 
         view = MockView()
 
         view.kwargs = {
-            "gym_id": gym_id or self.gym.id
+            "gym_id": gym_id or self.gym.id,
         }
 
         return view
 
-    # ========================================================
+    # ==================================================
     # CanViewPayment
-    # ========================================================
+    # ==================================================
 
     def test_owner_can_view_payment(self):
+        """Owners can view payments of their gym."""
         request = self.make_request(self.owner)
         view = self.make_view()
 
@@ -819,6 +835,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_manager_can_view_payment(self):
+        """Managers can view payments of their gym."""
         request = self.make_request(self.manager)
         view = self.make_view()
 
@@ -830,6 +847,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_staff_can_view_payment(self):
+        """Staff members can view payments of their gym."""
         request = self.make_request(self.staff)
         view = self.make_view()
 
@@ -841,6 +859,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_trainer_cannot_view_payment(self):
+        """Trainers cannot view gym payments."""
         request = self.make_request(self.trainer)
         view = self.make_view()
 
@@ -852,6 +871,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_member_cannot_view_payment(self):
+        """Members cannot view gym payments."""
         request = self.make_request(self.member)
         view = self.make_view()
 
@@ -863,6 +883,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_superuser_can_view_payment(self):
+        """Superusers can view payments."""
         request = self.make_request(self.superuser)
         view = self.make_view()
 
@@ -873,11 +894,12 @@ class PaymentPermissionTest(TestCase):
             )
         )
 
-    # ========================================================
+    # ==================================================
     # CanCreatePayment
-    # ========================================================
+    # ==================================================
 
     def test_owner_can_create_payment(self):
+        """Owners can create payments."""
         request = self.make_request(self.owner)
         view = self.make_view()
 
@@ -889,6 +911,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_manager_can_create_payment(self):
+        """Managers can create payments."""
         request = self.make_request(self.manager)
         view = self.make_view()
 
@@ -900,6 +923,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_staff_can_create_payment(self):
+        """Staff members can create payments."""
         request = self.make_request(self.staff)
         view = self.make_view()
 
@@ -911,6 +935,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_trainer_cannot_create_payment(self):
+        """Trainers cannot create payments."""
         request = self.make_request(self.trainer)
         view = self.make_view()
 
@@ -922,6 +947,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_member_cannot_create_payment(self):
+        """Members cannot create payments."""
         request = self.make_request(self.member)
         view = self.make_view()
 
@@ -933,6 +959,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_superuser_can_create_payment(self):
+        """Superusers can create payments."""
         request = self.make_request(self.superuser)
         view = self.make_view()
 
@@ -943,11 +970,12 @@ class PaymentPermissionTest(TestCase):
             )
         )
 
-    # ========================================================
+    # ==================================================
     # CanManagePayment
-    # ========================================================
+    # ==================================================
 
     def test_owner_can_manage_payment(self):
+        """Owners can manage payments."""
         request = self.make_request(self.owner)
         view = self.make_view()
 
@@ -960,6 +988,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_manager_can_manage_payment(self):
+        """Managers can manage payments."""
         request = self.make_request(self.manager)
         view = self.make_view()
 
@@ -972,6 +1001,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_staff_can_manage_payment(self):
+        """Staff members can manage payments."""
         request = self.make_request(self.staff)
         view = self.make_view()
 
@@ -984,6 +1014,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_trainer_cannot_manage_payment(self):
+        """Trainers cannot manage payments."""
         request = self.make_request(self.trainer)
         view = self.make_view()
 
@@ -996,6 +1027,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_member_cannot_manage_payment(self):
+        """Members cannot manage payments."""
         request = self.make_request(self.member)
         view = self.make_view()
 
@@ -1008,6 +1040,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_superuser_can_manage_payment(self):
+        """Superusers can manage payments."""
         request = self.make_request(self.superuser)
         view = self.make_view()
 
@@ -1019,11 +1052,12 @@ class PaymentPermissionTest(TestCase):
             )
         )
 
-    # ========================================================
+    # ==================================================
     # CanConfirmPayment
-    # ========================================================
+    # ==================================================
 
     def test_owner_can_confirm_payment(self):
+        """Owners can confirm payments."""
         request = self.make_request(self.owner)
         view = self.make_view()
 
@@ -1036,6 +1070,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_manager_can_confirm_payment(self):
+        """Managers can confirm payments."""
         request = self.make_request(self.manager)
         view = self.make_view()
 
@@ -1048,6 +1083,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_staff_can_confirm_payment(self):
+        """Staff members can confirm payments."""
         request = self.make_request(self.staff)
         view = self.make_view()
 
@@ -1060,6 +1096,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_trainer_cannot_confirm_payment(self):
+        """Trainers cannot confirm payments."""
         request = self.make_request(self.trainer)
         view = self.make_view()
 
@@ -1072,6 +1109,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_member_cannot_confirm_payment(self):
+        """Members cannot confirm payments."""
         request = self.make_request(self.member)
         view = self.make_view()
 
@@ -1084,6 +1122,7 @@ class PaymentPermissionTest(TestCase):
         )
 
     def test_superuser_can_confirm_payment(self):
+        """Superusers can confirm payments."""
         request = self.make_request(self.superuser)
         view = self.make_view()
 

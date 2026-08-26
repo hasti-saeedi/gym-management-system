@@ -7,7 +7,6 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.exceptions import NotFound
 
-
 from accounts.models import CustomUser
 from gyms.models import Gym, GymMembership
 from classes.models import GymClass, ClassSession
@@ -29,8 +28,10 @@ from enrollments.services.payment_services import (
 # =========================================================
 
 class EnrollmentModelTest(TestCase):
+    """Test the Enrollment model fields, defaults, relationships, and constraints."""
 
     def setUp(self):
+        """Create users, gym, trainer membership, and a gym class for testing."""
 
         self.user = CustomUser.objects.create_user(
             username="member1",
@@ -66,6 +67,7 @@ class EnrollmentModelTest(TestCase):
         )
 
     def test_create_enrollment(self):
+        """Test that an enrollment can be created for a user and gym class."""
 
         enrollment = Enrollment.objects.create(
             gym_class=self.gym_class,
@@ -83,6 +85,7 @@ class EnrollmentModelTest(TestCase):
         )
 
     def test_status_default_is_pending(self):
+        """Test that a new enrollment has a pending status by default."""
 
         enrollment = Enrollment.objects.create(
             gym_class=self.gym_class,
@@ -95,6 +98,7 @@ class EnrollmentModelTest(TestCase):
         )
 
     def test_attended_default_is_false(self):
+        """Test that the attended field defaults to False."""
 
         enrollment = Enrollment.objects.create(
             gym_class=self.gym_class,
@@ -106,6 +110,7 @@ class EnrollmentModelTest(TestCase):
         )
 
     def test_enrollment_type_default_is_semester(self):
+        """Test that the default enrollment type is semester."""
 
         enrollment = Enrollment.objects.create(
             gym_class=self.gym_class,
@@ -118,6 +123,7 @@ class EnrollmentModelTest(TestCase):
         )
 
     def test_enrollment_str(self):
+        """Test the string representation of an enrollment."""
 
         enrollment = Enrollment.objects.create(
             gym_class=self.gym_class,
@@ -131,6 +137,7 @@ class EnrollmentModelTest(TestCase):
         )
 
     def test_user_cannot_enroll_twice_in_same_class(self):
+        """Test that a user cannot create duplicate enrollments for the same class."""
 
         Enrollment.objects.create(
             gym_class=self.gym_class,
@@ -142,11 +149,11 @@ class EnrollmentModelTest(TestCase):
             user=self.user,
         )
 
-        # Model validation
         with self.assertRaises(DjangoValidationError):
             enrollment.full_clean()
 
     def test_single_session_can_be_selected(self):
+        """Test that a single-session enrollment can select a class session."""
 
         session = ClassSession.objects.create(
             gym_class=self.gym_class,
@@ -180,8 +187,10 @@ class EnrollmentModelTest(TestCase):
 # =========================================================
 
 class EnrollmentServiceTest(TestCase):
+    """Test enrollment business logic and service-level validation."""
 
     def setUp(self):
+        """Create a member, trainer, gym, memberships, and gym class for testing."""
 
         self.member = CustomUser.objects.create_user(
             username="member1",
@@ -224,6 +233,7 @@ class EnrollmentServiceTest(TestCase):
         )
 
     def test_create_semester_enrollment(self):
+        """Test successful creation of a semester enrollment and its pending payment."""
 
         enrollment = create_enrollment(
             user=self.member,
@@ -258,6 +268,7 @@ class EnrollmentServiceTest(TestCase):
         )
 
     def test_create_enrollment_class_not_found(self):
+        """Test that enrollment creation fails when the gym class does not exist."""
 
         with self.assertRaises(NotFound):
             create_enrollment(
@@ -267,11 +278,11 @@ class EnrollmentServiceTest(TestCase):
             )
 
     def test_cannot_enroll_in_inactive_class(self):
+        """Test that users cannot enroll in an inactive class."""
 
         self.gym_class.is_active = False
         self.gym_class.save()
 
-        # Service validation
         with self.assertRaises(DRFValidationError):
             create_enrollment(
                 user=self.member,
@@ -280,6 +291,7 @@ class EnrollmentServiceTest(TestCase):
             )
 
     def test_non_member_cannot_enroll(self):
+        """Test that users without an active gym membership cannot enroll."""
 
         another_user = CustomUser.objects.create_user(
             username="another",
@@ -294,6 +306,7 @@ class EnrollmentServiceTest(TestCase):
             )
 
     def test_trainer_cannot_enroll_in_own_class(self):
+        """Test that a trainer cannot enroll in their own class."""
 
         with self.assertRaises(DRFValidationError):
             create_enrollment(
@@ -303,6 +316,7 @@ class EnrollmentServiceTest(TestCase):
             )
 
     def test_duplicate_enrollment_is_not_allowed(self):
+        """Test that a user cannot enroll in the same class more than once."""
 
         create_enrollment(
             user=self.member,
@@ -318,6 +332,7 @@ class EnrollmentServiceTest(TestCase):
             )
 
     def test_cannot_enroll_when_class_is_full(self):
+        """Test that semester enrollment is rejected when the class is full."""
 
         self.gym_class.current_enrolled = self.gym_class.capacity
         self.gym_class.save()
@@ -330,6 +345,7 @@ class EnrollmentServiceTest(TestCase):
             )
 
     def create_session(self):
+        """Create and return a class session for service tests."""
 
         return ClassSession.objects.create(
             gym_class=self.gym_class,
@@ -343,6 +359,7 @@ class EnrollmentServiceTest(TestCase):
         )
 
     def test_create_single_enrollment(self):
+        """Test successful creation of an enrollment for selected sessions."""
 
         session = self.create_session()
 
@@ -364,6 +381,7 @@ class EnrollmentServiceTest(TestCase):
         )
 
     def test_single_enrollment_requires_session(self):
+        """Test that single-session enrollment requires at least one session."""
 
         with self.assertRaises(DRFValidationError):
             create_enrollment(
@@ -374,6 +392,7 @@ class EnrollmentServiceTest(TestCase):
             )
 
     def test_single_enrollment_with_invalid_session(self):
+        """Test that enrollment fails when a selected session does not exist."""
 
         with self.assertRaises(DRFValidationError):
             create_enrollment(
@@ -384,6 +403,7 @@ class EnrollmentServiceTest(TestCase):
             )
 
     def test_cancel_enrollment(self):
+        """Test that an existing enrollment can be cancelled without deletion."""
 
         enrollment = create_enrollment(
             user=self.member,
@@ -401,6 +421,7 @@ class EnrollmentServiceTest(TestCase):
         )
 
     def test_cannot_cancel_already_cancelled_enrollment(self):
+        """Test that an already cancelled enrollment cannot be cancelled again."""
 
         enrollment = create_enrollment(
             user=self.member,
@@ -423,8 +444,10 @@ class EnrollmentServiceTest(TestCase):
 # =========================================================
 
 class PaymentModelTest(TestCase):
+    """Test the Payment model fields, defaults, validation, and string representation."""
 
     def setUp(self):
+        """Create users, gym, trainer membership, class, and enrollment for payment tests."""
 
         self.user = CustomUser.objects.create_user(
             username="member1",
@@ -465,6 +488,7 @@ class PaymentModelTest(TestCase):
         )
 
     def test_create_payment(self):
+        """Test that a payment can be created with a valid amount."""
 
         payment = Payment.objects.create(
             enrollment=self.enrollment,
@@ -477,6 +501,7 @@ class PaymentModelTest(TestCase):
         )
 
     def test_payment_status_default_is_pending(self):
+        """Test that a newly created payment has a pending status."""
 
         payment = Payment.objects.create(
             enrollment=self.enrollment,
@@ -489,6 +514,7 @@ class PaymentModelTest(TestCase):
         )
 
     def test_payment_amount_must_be_greater_than_zero(self):
+        """Test that a payment amount cannot be zero."""
 
         payment = Payment(
             enrollment=self.enrollment,
@@ -499,6 +525,7 @@ class PaymentModelTest(TestCase):
             payment.full_clean()
 
     def test_payment_amount_cannot_be_negative(self):
+        """Test that a payment amount cannot be negative."""
 
         payment = Payment(
             enrollment=self.enrollment,
@@ -509,6 +536,7 @@ class PaymentModelTest(TestCase):
             payment.full_clean()
 
     def test_completed_payment_requires_transaction_id(self):
+        """Test that a completed payment must have a transaction ID."""
 
         payment = Payment(
             enrollment=self.enrollment,
@@ -520,6 +548,7 @@ class PaymentModelTest(TestCase):
             payment.full_clean()
 
     def test_completed_payment_with_transaction_id_is_valid(self):
+        """Test that a completed payment with a transaction ID passes validation."""
 
         payment = Payment(
             enrollment=self.enrollment,
@@ -536,6 +565,7 @@ class PaymentModelTest(TestCase):
         )
 
     def test_payment_str(self):
+        """Test the string representation of a payment."""
 
         payment = Payment.objects.create(
             enrollment=self.enrollment,
@@ -553,8 +583,10 @@ class PaymentModelTest(TestCase):
 # =========================================================
 
 class PaymentServiceTest(TestCase):
+    """Test payment creation, calculation, confirmation, and related enrollment updates."""
 
     def setUp(self):
+        """Create a member, trainer, gym, memberships, and gym class for payment service tests."""
 
         self.member = CustomUser.objects.create_user(
             username="member1",
@@ -597,6 +629,7 @@ class PaymentServiceTest(TestCase):
         )
 
     def test_create_payment_for_semester(self):
+        """Test that a semester enrollment creates a payment using the class price."""
 
         enrollment = Enrollment.objects.create(
             user=self.member,
@@ -619,6 +652,7 @@ class PaymentServiceTest(TestCase):
         )
 
     def test_cannot_create_duplicate_payment(self):
+        """Test that an enrollment cannot have more than one payment."""
 
         enrollment = Enrollment.objects.create(
             user=self.member,
@@ -636,6 +670,7 @@ class PaymentServiceTest(TestCase):
             )
 
     def create_session(self):
+        """Create and return a class session for payment tests."""
 
         return ClassSession.objects.create(
             gym_class=self.gym_class,
@@ -649,6 +684,7 @@ class PaymentServiceTest(TestCase):
         )
 
     def test_create_payment_for_single_enrollment(self):
+        """Test that a single-session enrollment uses the per-session price."""
 
         session1 = self.create_session()
 
@@ -672,6 +708,7 @@ class PaymentServiceTest(TestCase):
         )
 
     def test_single_enrollment_payment_depends_on_session_count(self):
+        """Test that single-session payment amount depends on the number of selected sessions."""
 
         session1 = self.create_session()
 
@@ -707,6 +744,7 @@ class PaymentServiceTest(TestCase):
         )
 
     def test_single_payment_requires_selected_session(self):
+        """Test that single-session payment creation fails without selected sessions."""
 
         enrollment = Enrollment.objects.create(
             user=self.member,
@@ -720,6 +758,7 @@ class PaymentServiceTest(TestCase):
             )
 
     def test_invalid_enrollment_type(self):
+        """Test that payment creation fails for an invalid enrollment type."""
 
         enrollment = Enrollment.objects.create(
             user=self.member,
@@ -733,6 +772,7 @@ class PaymentServiceTest(TestCase):
             create_payment(enrollment)
 
     def test_confirm_payment(self):
+        """Test that confirming a payment completes the payment and approves the enrollment."""
 
         enrollment = Enrollment.objects.create(
             user=self.member,
@@ -762,6 +802,7 @@ class PaymentServiceTest(TestCase):
         )
 
     def test_confirm_payment_increases_current_enrolled(self):
+        """Test that confirming a semester payment increases the class enrollment count."""
 
         enrollment = Enrollment.objects.create(
             user=self.member,
@@ -786,6 +827,7 @@ class PaymentServiceTest(TestCase):
         )
 
     def test_confirm_nonexistent_payment(self):
+        """Test that confirming a nonexistent payment raises NotFound."""
 
         with self.assertRaises(NotFound):
             confirm_payment(
@@ -794,6 +836,7 @@ class PaymentServiceTest(TestCase):
             )
 
     def test_cannot_confirm_completed_payment_twice(self):
+        """Test that a completed payment cannot be confirmed a second time."""
 
         enrollment = Enrollment.objects.create(
             user=self.member,

@@ -1,54 +1,40 @@
 from django.urls import path
 
 from .views import (
-    LoginView,
     CurrentUserView,
+    GymUserViewSet,
+    LoginView,
     LogoutView,
     RegisterView,
-    GymUserViewSet,
 )
 
 
 urlpatterns = [
-
-    # ==============================
     # Authentication
-    # ==============================
-
     path(
         "login/",
         LoginView.as_view(),
         name="login",
     ),
-
     path(
         "logout/",
         LogoutView.as_view(),
         name="logout",
     ),
-
     path(
         "register/",
         RegisterView.as_view(),
         name="register",
     ),
 
-
-    # ==============================
-    # Current User
-    # ==============================
-
+    # Current user
     path(
         "me/",
         CurrentUserView.as_view(),
         name="current-user",
     ),
 
-
-    # ==============================
-    # Gym Users
-    # ==============================
-
+    # Gym users
     path(
         "gyms/<int:gym_id>/users/",
         GymUserViewSet.as_view({
@@ -57,8 +43,6 @@ urlpatterns = [
         }),
         name="gym-users",
     ),
-
-
     path(
         "gyms/<int:gym_id>/users/<int:pk>/",
         GymUserViewSet.as_view({
@@ -69,6 +53,4 @@ urlpatterns = [
         }),
         name="gym-user-detail",
     ),
-
 ]
-

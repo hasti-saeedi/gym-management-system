@@ -1,35 +1,48 @@
-from django.test import TestCase
-from rest_framework.test import APIRequestFactory
 from datetime import datetime
-from django.utils import timezone
-from accounts.models import CustomUser
-from gyms.models import (
-    Gym,
-    GymMembership,
-)
-from classes.models import (
-    GymClass,
-    ClassSession,
-)
 
+from django.test import TestCase
+from django.utils import timezone
+from rest_framework.test import APIRequestFactory
+
+from accounts.models import CustomUser
+from classes.models import ClassSession, GymClass
+from gyms.models import Gym, GymMembership
 from permissions.class_permissions import (
-    CanManageGymClass,
-    CanCreateSession,
     CanAccessSession,
+    CanCreateSession,
     CanDeleteSession,
-    CanViewSessionStudents,
+    CanManageGymClass,
     CanRecordAttendance,
+    CanViewSessionStudents,
 )
 
 
 class ClassPermissionsTestCase(TestCase):
+    """
+    Test suite for class and class-session permissions.
+
+    Covers permissions related to:
+
+    - Managing gym classes
+    - Creating class sessions
+    - Accessing class sessions
+    - Deleting class sessions
+    - Viewing session students
+    - Recording session attendance
+
+    The tests verify access for different gym roles,
+    including Owner, Manager, Staff, Trainer, Member,
+    and Superuser where applicable.
+    """
 
     def setUp(self):
+        """Create users, gym memberships, class, session, and test views."""
+
         self.factory = APIRequestFactory()
 
-        # -------------------------------------------------
+        # =========================================================
         # Users
-        # -------------------------------------------------
+        # =========================================================
 
         self.owner = CustomUser.objects.create_user(
             username="owner",
@@ -61,17 +74,17 @@ class ClassPermissionsTestCase(TestCase):
             password="Test1234",
         )
 
-        # -------------------------------------------------
+        # =========================================================
         # Gym
-        # -------------------------------------------------
+        # =========================================================
 
         self.gym = Gym.objects.create(
             name="Test Gym",
         )
 
-        # -------------------------------------------------
-        # Memberships
-        # -------------------------------------------------
+        # =========================================================
+        # Gym Memberships
+        # =========================================================
 
         GymMembership.objects.create(
             user=self.owner,
@@ -109,13 +122,13 @@ class ClassPermissionsTestCase(TestCase):
             user=self.trainer,
             gym=self.gym,
             role=GymMembership.Role.TRAINER,
-            is_active=True,
             salary=20,
+            is_active=True,
         )
 
-        # -------------------------------------------------
+        # =========================================================
         # Gym Class
-        # -------------------------------------------------
+        # =========================================================
 
         self.gym_class = GymClass.objects.create(
             name="Test Class",
@@ -131,28 +144,26 @@ class ClassPermissionsTestCase(TestCase):
             single_session_price=20000,
         )
 
-        # -------------------------------------------------
+        # =========================================================
         # Class Session
-        # -------------------------------------------------
-
-        # self.session = ClassSession.objects.create(
-        #     gym_class=self.gym_class,
-        #         date="2026-08-24",
-        #         start_time="10:00",
-        #         end_time="11:00",
-        # )
+        # =========================================================
 
         self.session = ClassSession.objects.create(
             gym_class=self.gym_class,
-            start_time=timezone.make_aware(datetime(2026, 8, 20, 10, 0)),
-            end_time=timezone.make_aware(datetime(2026, 8, 20, 11, 0)),
+            start_time=timezone.make_aware(
+                datetime(2026, 8, 20, 10, 0)
+            ),
+            end_time=timezone.make_aware(
+                datetime(2026, 8, 20, 11, 0)
+            ),
             trainer=self.trainer,
-            )
+        )
 
-        # -------------------------------------------------
-        # View for GymPermission
-        # -------------------------------------------------
+        # =========================================================
+        # Views
+        # =========================================================
 
+        # View containing gym_id for GymPermission-based classes.
         self.gym_view = type(
             "View",
             (),
@@ -163,7 +174,7 @@ class ClassPermissionsTestCase(TestCase):
             },
         )()
 
-        # View for CanCreateSession
+        # View used by CanCreateSession.
         self.session_view = type(
             "View",
             (),
@@ -172,11 +183,13 @@ class ClassPermissionsTestCase(TestCase):
             },
         )()
 
-    # =====================================================
+    # =========================================================
     # CanManageGymClass
-    # =====================================================
+    # =========================================================
 
     def test_manage_gym_class_allows_owner(self):
+        """Owner can manage gym classes."""
+
         request = self.factory.get("/")
         request.user = self.owner
 
@@ -190,6 +203,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_class_allows_manager(self):
+        """Manager can manage gym classes."""
+
         request = self.factory.get("/")
         request.user = self.manager
 
@@ -203,6 +218,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_class_allows_staff(self):
+        """Staff can manage gym classes."""
+
         request = self.factory.get("/")
         request.user = self.staff
 
@@ -216,6 +233,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_class_denies_member(self):
+        """Member cannot manage gym classes."""
+
         request = self.factory.get("/")
         request.user = self.member
 
@@ -229,6 +248,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_class_allows_superuser(self):
+        """Superuser can manage gym classes."""
+
         request = self.factory.get("/")
         request.user = self.superuser
 
@@ -242,6 +263,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_manage_gym_class_object_permission(self):
+        """Owner has object-level permission for a gym class."""
+
         request = self.factory.get("/")
         request.user = self.owner
 
@@ -255,11 +278,13 @@ class ClassPermissionsTestCase(TestCase):
             )
         )
 
-    # =====================================================
+    # =========================================================
     # CanCreateSession
-    # =====================================================
+    # =========================================================
 
     def test_create_session_allows_owner(self):
+        """Owner can create class sessions."""
+
         request = self.factory.post("/")
         request.user = self.owner
 
@@ -273,6 +298,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_create_session_allows_manager(self):
+        """Manager can create class sessions."""
+
         request = self.factory.post("/")
         request.user = self.manager
 
@@ -286,6 +313,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_create_session_allows_staff(self):
+        """Staff can create class sessions."""
+
         request = self.factory.post("/")
         request.user = self.staff
 
@@ -299,6 +328,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_create_session_allows_trainer(self):
+        """Trainer can create class sessions."""
+
         request = self.factory.post("/")
         request.user = self.trainer
 
@@ -312,6 +343,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_create_session_denies_member(self):
+        """Member cannot create class sessions."""
+
         request = self.factory.post("/")
         request.user = self.member
 
@@ -324,11 +357,13 @@ class ClassPermissionsTestCase(TestCase):
             )
         )
 
-    # =====================================================
+    # =========================================================
     # CanAccessSession
-    # =====================================================
+    # =========================================================
 
     def test_access_session_allows_owner(self):
+        """Owner can access a class session."""
+
         request = self.factory.get("/")
         request.user = self.owner
 
@@ -343,6 +378,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_access_session_allows_manager(self):
+        """Manager can access a class session."""
+
         request = self.factory.get("/")
         request.user = self.manager
 
@@ -357,6 +394,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_access_session_allows_staff(self):
+        """Staff can access a class session."""
+
         request = self.factory.get("/")
         request.user = self.staff
 
@@ -371,6 +410,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_access_session_allows_trainer(self):
+        """Trainer can access a class session."""
+
         request = self.factory.get("/")
         request.user = self.trainer
 
@@ -385,6 +426,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_access_session_denies_member(self):
+        """Member cannot access a class session."""
+
         request = self.factory.get("/")
         request.user = self.member
 
@@ -398,11 +441,13 @@ class ClassPermissionsTestCase(TestCase):
             )
         )
 
-    # =====================================================
+    # =========================================================
     # CanDeleteSession
-    # =====================================================
+    # =========================================================
 
     def test_delete_session_allows_owner(self):
+        """Owner can delete a class session."""
+
         request = self.factory.delete("/")
         request.user = self.owner
 
@@ -417,6 +462,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_delete_session_allows_manager(self):
+        """Manager can delete a class session."""
+
         request = self.factory.delete("/")
         request.user = self.manager
 
@@ -431,6 +478,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_delete_session_allows_staff(self):
+        """Staff can delete a class session."""
+
         request = self.factory.delete("/")
         request.user = self.staff
 
@@ -445,6 +494,8 @@ class ClassPermissionsTestCase(TestCase):
         )
 
     def test_delete_session_denies_member(self):
+        """Member cannot delete a class session."""
+
         request = self.factory.delete("/")
         request.user = self.member
 
@@ -458,11 +509,15 @@ class ClassPermissionsTestCase(TestCase):
             )
         )
 
-    # =====================================================
+    # =========================================================
     # CanViewSessionStudents
-    # =====================================================
+    # =========================================================
 
     def test_view_session_students_uses_session_access(self):
+        """
+        Session-student access follows the session access permission.
+        """
+
         request = self.factory.get("/")
         request.user = self.owner
 
@@ -476,11 +531,15 @@ class ClassPermissionsTestCase(TestCase):
             )
         )
 
-    # =====================================================
+    # =========================================================
     # CanRecordAttendance
-    # =====================================================
+    # =========================================================
 
     def test_record_attendance_uses_session_access(self):
+        """
+        Attendance recording follows the session access permission.
+        """
+
         request = self.factory.patch("/")
         request.user = self.trainer
 

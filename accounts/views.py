@@ -1,214 +1,80 @@
-from .models import CustomUser
-from gyms.models import Gym
-
 from django.shortcuts import get_object_or_404
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status, viewsets
+
 from django_filters.rest_framework import DjangoFilterBackend
 
+from rest_framework import status, viewsets
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from drf_spectacular.utils import extend_schema
-from rest_framework.permissions import (
-    IsAuthenticated,
-    AllowAny,
-)
+
 from permissions.base_permissions import IsAnonymous
 
-
+from .models import CustomUser
 from .serializers import (
+    CreateGymUserSerializer,
+    CurrentUserSerializer,
+    CurrentUserUpdateSerializer,
     CustomUserSerializer,
-    LoginSerializer, 
-    CurrentUserSerializer, 
+    GymUserSerializer,
+    LoginSerializer,
     LogoutSerializer,
     RegisterSerializer,
-    CreateGymUserSerializer,
-    CurrentUserUpdateSerializer,
-    GymUserSerializer,
 )
-
-from .services.authentication_services import (
-    login_service, 
-    logout_service
-)
-
+from .services.authentication_services import login_service, logout_service
 from .services.user_services import (
-    register_member, 
     create_gym_user,
+    register_member,
     update_current_user,
 )
-
-from rest_framework.filters import (
-    SearchFilter,
-    OrderingFilter,
-)
+from gyms.models import Gym
 
 
-
-# کلی قدیمی
-# class CustomUserViewSet(viewsets.ModelViewSet):
-    # queryset = CustomUser.objects.all()
-    # serializer_class = CustomUserSerializer
-
-    # filter_backends = [
-    #     DjangoFilterBackend,
-    #     SearchFilter,
-    #     OrderingFilter,
-    # ]
-    # search_fields = [
-    #     "username",
-    #     "first_name",
-    #     "last_name",
-    # ]
-    # filterset_fields = [
-    #     "is_active",
-    # ]
-
-    # ordering_fields = [
-    #     "username",
-    #     "date_joined",
-    #     "first_name",
-    #     "last_name",
-    # ]
-
-
-    # def get_permissions(self):
-
-    #     """
-    #     Assigns permissions based on DRF ViewSet actions.
-
-    #     Swagger mapping:
-
-    #     GET /api/accounts/users/
-    #         Action: list
-    #         Permission: CanViewUsers
-
-    #     POST /api/accounts/users/
-    #         Action: create
-    #         Permission: CanCreateUser
-
-    #     GET /api/accounts/users/{id}/
-    #         Action: retrieve
-    #         Permission: CanViewUserDetail
-
-    #     PUT /api/accounts/users/{id}/
-    #         Action: update
-    #         Permission: CanUpdateUser
-
-    #     PATCH /api/accounts/users/{id}/
-    #         Action: partial_update
-    #         Permission: CanUpdateUser
-
-    #     DELETE /api/accounts/users/{id}/
-    #         Action: destroy
-    #         Permission: CanDeleteUser
-    #     """
-
-    #     if self.action == "list":
-    #         permission_classes = [
-    #             CanViewUsers
-    #         ]
-
-    #     elif self.action == "create":
-    #         permission_classes = [
-    #             CanCreateUser
-    #         ]
-
-    #     elif self.action == "retrieve":
-    #         permission_classes = [
-    #             CanViewUserDetail
-    #         ]
-
-    #     elif self.action in [
-    #         "update",
-    #         "partial_update",
-    #     ]:
-    #         permission_classes = [
-    #             CanUpdateUser
-    #         ]
-
-    #     elif self.action == "destroy":
-    #         permission_classes = [
-    #             CanDeleteUser
-    #         ]
-
-    #     else:
-    #         permission_classes = []
-
-    #     return [
-    #         permission() #از روی کلاس، یک آبجکت بسازیم.
-    #         for permission in permission_classes
-    #     ]
-    
-    # def get_serializer_class(self):
-
-    #     serializer_map = {
-    #         "create": CreateGymUserSerializer,
-    #         "list": CustomUserSerializer,
-    #         "retrieve": CustomUserSerializer,
-    #         "update": CustomUserSerializer,
-    #         "partial_update": CustomUserSerializer,
-    #     }
-
-    #     return serializer_map.get(
-    #         self.action,
-    #         CustomUserSerializer,
-    #     )
-        
-    # def create(self, request, *args, **kwargs):
-
-
-    #     serializer = self.get_serializer(
-    #         data=request.data
-    #     )
-
-    #     serializer.is_valid(
-    #         raise_exception=True
-    #     )
-
-    #     user = create_gym_user(
-    #         creator=request.user,
-    #         validated_data=serializer.validated_data,
-    #     )
-
-    #     return Response(
-    #         CustomUserSerializer(user).data,
-    #         status=status.HTTP_201_CREATED,
-    #     )
-
-#برای patch/me
 class CurrentUserView(APIView):
     """
-    APIs:
+    Retrieve and update the authenticated user's profile.
 
-    GET:
-        /api/accounts/me/
-
-    PATCH:
-        /api/accounts/me/
-
-    Description:
-        Allows authenticated users to
-        view and update their own profile.
+    Endpoints:
+        GET: Retrieve the current user's profile.
+        PATCH: Partially update the current user's profile.
     """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """
+        Return the authenticated user's profile.
 
+        Args:
+            request: The HTTP request containing the authenticated user.
+
+        Returns:
+            Response: The serialized user profile.
+        """
         serializer = CurrentUserSerializer(request.user)
 
         return Response(serializer.data)
 
     @extend_schema(
-    request=CurrentUserUpdateSerializer,
-    responses=CurrentUserSerializer,
+        request=CurrentUserUpdateSerializer,
+        responses=CurrentUserSerializer,
     )
     def patch(self, request):
+        """
+        Partially update the authenticated user's profile.
 
+        Args:
+            request: The HTTP request containing the updated profile data.
+
+        Returns:
+            Response: The updated user profile.
+        """
         serializer = CurrentUserUpdateSerializer(
             request.user,
             data=request.data,
-            partial=True, #فیلد مخصوص پچ است یعنی لازم نیست همه اطلاعات ارسال شوند
+            partial=True,
         )
 
         serializer.is_valid(raise_exception=True)
@@ -224,8 +90,17 @@ class CurrentUserView(APIView):
         )
 
 
-# برای یوزر یک جیم خاص
 class GymUserViewSet(viewsets.ModelViewSet):
+    """
+    Manage users belonging to a specific gym.
+
+    Provides endpoints for listing, creating, retrieving, updating,
+    and deleting users associated with the requested gym.
+
+    Users are limited to active memberships in the requested gym.
+    Permissions and serializers are selected according to the
+    current ViewSet action.
+    """
 
     queryset = CustomUser.objects.all()
 
@@ -234,11 +109,13 @@ class GymUserViewSet(viewsets.ModelViewSet):
         SearchFilter,
         OrderingFilter,
     ]
+
     search_fields = [
         "username",
         "first_name",
         "last_name",
     ]
+
     filterset_fields = [
         "is_active",
     ]
@@ -251,122 +128,98 @@ class GymUserViewSet(viewsets.ModelViewSet):
     ]
 
     def get_serializer_class(self):
+        """
+        Return the serializer appropriate for the current action.
 
+        Returns:
+            type: The serializer class associated with the current action.
+        """
         if self.action == "create":
             return CreateGymUserSerializer
 
-        if self.action in [
-            "list",
-            "retrieve",
-        ]:
+        if self.action in ["list", "retrieve"]:
             return GymUserSerializer
-        
+
         return CustomUserSerializer
 
-
-
     def get_permissions(self):
+        """
+        Select the permission class based on the current action.
+
+        Returns:
+            list: Permission instances required for the current action.
+        """
         from permissions.account_permissions import (
-            CanViewGymUsers,
             CanCreateGymUser,
-            CanViewGymUserDetail,
-            CanUpdateGymUser,
             CanDeleteGymUser,
+            CanUpdateGymUser,
+            CanViewGymUserDetail,
+            CanViewGymUsers,
+        )
 
-            )
-        """
-        Select permission class based on
-        current ViewSet action.
+        permission_map = {
+            "list": [CanViewGymUsers],
+            "create": [CanCreateGymUser],
+            "retrieve": [CanViewGymUserDetail],
+            "update": [CanUpdateGymUser],
+            "partial_update": [CanUpdateGymUser],
+            "destroy": [CanDeleteGymUser],
+        }
 
-        DRF actions:
-
-        list:
-            GET collection
-
-        create:
-            POST collection
-
-        retrieve:
-            GET single object
-
-        update:
-            PUT single object
-
-        partial_update:
-            PATCH single object
-
-        destroy:
-            DELETE single object
-        """
-
-
-        if self.action == "list":
-            permission_classes = [
-                CanViewGymUsers
-            ]
-
-        elif self.action == "create":
-            permission_classes = [
-                CanCreateGymUser
-            ]
-
-        elif self.action == "retrieve":
-            permission_classes = [
-                CanViewGymUserDetail
-            ]
-
-        elif self.action in [
-            "update",
-            "partial_update"
-        ]:
-            permission_classes = [
-                CanUpdateGymUser
-            ]
-
-        elif self.action == "destroy":
-            permission_classes = [
-                CanDeleteGymUser
-            ]
-
-        else:
-            permission_classes = []
-
+        permission_classes = permission_map.get(self.action, [])
 
         return [
             permission()
             for permission in permission_classes
         ]
 
-#GET /gyms/{gym_id}/users/
     def get_queryset(self):
+        """
+        Return active users who are members of the requested gym.
 
+        Returns:
+            QuerySet: Active users with an active membership in the gym.
+
+        Raises:
+            Http404: If the requested gym does not exist.
+        """
         gym_id = self.kwargs.get("gym_id")
 
         get_object_or_404(
             Gym,
-            id=gym_id
+            pk=gym_id,
         )
 
+        return (
+            CustomUser.objects.filter(
+                memberships__gym_id=gym_id,
+                memberships__is_active=True,
+            )
+            .distinct()
+        )
 
-        return CustomUser.objects.filter(
-            memberships__gym_id=gym_id,
-            memberships__is_active=True,
-        ).distinct()
-
-#  POST /gyms/{gym_id}/users/
     def create(self, request, gym_id):
+        """
+        Create a new user and assign them to the requested gym.
 
+        Args:
+            request: The HTTP request containing the user data.
+            gym_id: The ID of the gym where the user will be assigned.
 
+        Returns:
+            Response: The newly created user's serialized data.
+        """
         serializer = self.get_serializer(
-            data=request.data
+            data=request.data,
         )
 
         serializer.is_valid(
-            raise_exception=True
+            raise_exception=True,
         )
 
-        gym = Gym.objects.get(
-            id=gym_id
+        gym = get_object_or_404(
+            Gym,
+            pk=gym_id,
         )
 
         user = create_gym_user(
@@ -375,7 +228,6 @@ class GymUserViewSet(viewsets.ModelViewSet):
             validated_data=serializer.validated_data,
         )
 
-
         return Response(
             CustomUserSerializer(user).data,
             status=status.HTTP_201_CREATED,
@@ -383,32 +235,29 @@ class GymUserViewSet(viewsets.ModelViewSet):
 
 
 class RegisterView(APIView):
-
     """
-    API:
+    Register a new gym member.
 
-    POST:
-        /api/accounts/register/
-
-
-    Description:
-
-        Creates a new member account.
-
-        User selects a gym and
-        becomes a gym member.
+    The user selects an active gym during registration and is
+    automatically assigned the MEMBER role.
     """
-            
-    permission_classes = [
-        IsAnonymous
-    ]
+
+    permission_classes = [IsAnonymous]
 
     @extend_schema(
         request=RegisterSerializer,
         responses={201: CustomUserSerializer},
     )
     def post(self, request):
+        """
+        Create a new member account.
 
+        Args:
+            request: The HTTP request containing registration data.
+
+        Returns:
+            Response: The newly created member's serialized data.
+        """
         serializer = RegisterSerializer(
             data=request.data,
         )
@@ -428,34 +277,36 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
-
     """
-    API:
+    Authenticate a user and issue JWT tokens.
 
-    POST:
-        /api/accounts/login/
-
-
-    Description:
-
-        Authenticates user and
-        returns JWT tokens.
+    Returns access and refresh tokens together with the
+    authenticated user's basic information.
     """
 
-
-    permission_classes = [
-        AllowAny
-    ]
+    permission_classes = [AllowAny]
 
     @extend_schema(
-    request=LoginSerializer,
-    responses={200: None},
+        request=LoginSerializer,
+        responses={200: None},
     )
-        # Login فقط POST دارد
     def post(self, request):
+        """
+        Authenticate the user and return JWT tokens.
 
-        serializer = LoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        Args:
+            request: The HTTP request containing login credentials.
+
+        Returns:
+            Response: Access and refresh tokens with user information.
+        """
+        serializer = LoginSerializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
 
         result = login_service(
             username=serializer.validated_data["username"],
@@ -466,46 +317,45 @@ class LoginView(APIView):
             {
                 "access": result["access"],
                 "refresh": result["refresh"],
-                "user": CurrentUserSerializer(result["user"]).data,
+                "user": CurrentUserSerializer(
+                    result["user"]
+                ).data,
             },
             status=status.HTTP_200_OK,
         )
 
 
 class LogoutView(APIView):
-
-    
     """
-    API:
-
-    POST:
-        /api/accounts/logout/
-
-
-    Description:
-
-        Invalidates refresh token
-        and logs out authenticated user.
+    Log out an authenticated user by invalidating their refresh token.
     """
-
-
-    permission_classes = [
-        IsAuthenticated
-    ]
 
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-    request=LogoutSerializer,
-    responses={200: None},
+        request=LogoutSerializer,
+        responses={200: None},
     )
     def post(self, request):
+        """
+        Invalidate the provided refresh token.
 
-        serializer = LogoutSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        Args:
+            request: The HTTP request containing the refresh token.
+
+        Returns:
+            Response: A confirmation that the user has been logged out.
+        """
+        serializer = LogoutSerializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
 
         logout_service(
-            serializer.validated_data["refresh"]
+            serializer.validated_data["refresh"],
         )
 
         return Response(

@@ -1,65 +1,105 @@
-from classes.models import ClassSession
-from enrollments.models import Enrollment
-from rest_framework.exceptions import NotFound, ValidationError
 from django.db import transaction
 
-    #برگرداندن ردیف اینرولمنت همه ثبت نام های ان جلسه 
-# خروجی == QuerySet<Enrollment>  ینی یعنی یک مجموعه از Enrollmentها.
+from rest_framework.exceptions import NotFound, ValidationError
+
+from classes.models import ClassSession
+from enrollments.models import Enrollment
+
+
 def get_enrolled_students(session_id):
+    """
+    Retrieve all approved enrollments associated with a class session.
+
+    Semester enrollments are included automatically, while single-session
+    enrollments are included only when the requested session is selected.
+
+    Args:
+        session_id (int): The ID of the class session.
+
+    Returns:
+        QuerySet: A queryset containing approved enrollments for the session.
+
+    Raises:
+        NotFound: If the specified class session does not exist.
+    """
 
     try:
-        session = ClassSession.objects.get(id=session_id)#object
+        session = ClassSession.objects.get(
+            id=session_id,
+        )
     except ClassSession.DoesNotExist:
         raise NotFound("Session not found.")
+
     gym_class = session.gym_class
-    enrollments_semester = Enrollment.objects.filter(  #"queryset"
-        status = 'approved',
-        gym_class = gym_class,
-        enrollment_type = 'semester'
+
+    enrollments_semester = Enrollment.objects.filter(
+        status="approved",
+        gym_class=gym_class,
+        enrollment_type="semester",
     )
 
-    enrollments_single  = Enrollment.objects.filter( #"queryset"
-        status = 'approved',
-        gym_class = gym_class,
-        enrollment_type = 'single',
-        selected_sessions = session
-    )
-    enrollments = enrollments_semester | enrollments_single #"queryset"
-
-    return enrollments #"queryset"
-
-    #ثبت حضورو غیاب جلسه
-
-def record_attendance(session_id, user_id, attendance_status):
-    
-    with transaction.atomic():
-
-        try:
-            session = ClassSession.objects.get( #object
-                id = session_id
-            )# خروجی یک یک آبجکت از سشنی که میخواهیم یعنی ستونی از ان جلسه مورد نظر
-                #<ClassSession: Yoga Session 1>
-        except ClassSession.DoesNotExist:
-            raise NotFound("session not found")
-        
-        enrollments = get_enrolled_students(session_id) #queryset
-        
-        # خروجی == ستونی از اینرولمنت هایی که به این کلاس یا جلسه مربوط اند
-                # خروجی == QuerySet<Enrollment>  همان یعنی یک مجموعه از Enrollmentها.
-        if not enrollments.filter(
-            user__id = user_id
-            ).exists(): # اگه در اون اینرولمنت ها ایدی یوزری که میدهد وجود نداشت 
-            raise ValidationError(
-        "User is not enrolled in this session."
+    enrollments_single = Enrollment.objects.filter(
+        status="approved",
+        gym_class=gym_class,
+        enrollment_type="single",
+        selected_sessions=session,
     )
 
-        # session.attendance[str(user_id)] = attendance_status
-        session.attendance[str(user_id)] = {
-            "present": attendance_status # چون در گت اتندنس در مدل که داریم تعداد پرسنت:ترو رو چک میکنه
-        }
-        session.save(update_fields=["attendance"])
-        
-        return session
+    enrollments = enrollments_semester | enrollments_single
+
+    return enrollments
+
+
+@transaction.atomic
+def record_attendance(
+    session_id,
+    user_id,
+    attendance_status,
+):
+    """
+    Record a user's attendance status for a specific class session.
+
+    The user must have an approved enrollment for the session, either
+    through a semester enrollment or a selected single-session enrollment.
+
+    Args:
+        session_id (int): The ID of the class session.
+        user_id (int): The ID of the user whose attendance is being recorded.
+        attendance_status (bool): Whether the user attended the session.
+
+    Returns:
+        ClassSession: The updated class session instance.
+
+    Raises:
+        NotFound: If the specified class session does not exist.
+        ValidationError: If the user is not enrolled in the session.
+    """
+
+    try:
+        session = ClassSession.objects.get(
+            id=session_id,
+        )
+    except ClassSession.DoesNotExist:
+        raise NotFound("Session not found.")
+
+    enrollments = get_enrolled_students(session_id)
+
+    if not enrollments.filter(
+        user__id=user_id,
+    ).exists():
+        raise ValidationError(
+            "User is not enrolled in this session."
+        )
+
+    session.attendance[str(user_id)] = {
+        "present": attendance_status,
+    }
+
+    session.save(
+        update_fields=["attendance"],
+    )
+
+    return session
             
         
         

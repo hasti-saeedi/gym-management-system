@@ -1,45 +1,41 @@
+from datetime import time, timedelta
 from decimal import Decimal
-from datetime import date, time, timedelta
 
 from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import CustomUser
-from gyms.models import Gym, GymMembership
-from classes.models import GymClass, ClassSession
+from classes.models import ClassSession, GymClass
 from enrollments.models import Enrollment
-
+from gyms.models import Gym, GymMembership
 from reports.models import Report
 
 from reports.services.attendance_report_service import (
     get_attendance_statistics,
-    get_today_sessions,
     get_cancelled_sessions,
+    get_today_sessions,
 )
-from reports.services.class_report_service import (
-    get_class_statistics,
-)
+from reports.services.class_report_service import get_class_statistics
 from reports.services.dashboard_service import (
-    get_member_statistics,
-    get_staff_statistics,
-    get_session_statistics,
-    get_gym_info,
     get_dashboard,
+    get_gym_info,
+    get_member_statistics,
+    get_session_statistics,
+    get_staff_statistics,
 )
 from reports.services.member_report_service import (
     get_member_statistics as get_member_report_statistics,
-    get_new_members,
     get_members_by_month,
+    get_new_members,
 )
 from reports.services.staff_report_service import (
     get_staff_statistics as get_staff_report_statistics,
 )
-from reports.services.trainer_report_service import (
-    get_trainers_workload,
-)
+from reports.services.trainer_report_service import get_trainers_workload
 
 
 class ReportModelTest(TestCase):
+    """Test the Report model."""
 
     def setUp(self):
         self.user = CustomUser.objects.create_user(
@@ -76,12 +72,16 @@ class ReportModelTest(TestCase):
             generated_by=self.user,
         )
 
-        expected = f"Monthly Report - {report.created_at.strftime('%Y-%m-%d')}"
+        expected = (
+            f"Monthly Report - "
+            f"{report.created_at.strftime('%Y-%m-%d')}"
+        )
 
         self.assertEqual(str(report), expected)
 
     def test_report_ordering(self):
         now = timezone.now()
+
         first = Report.objects.create(
             title="First",
             report_type="daily",
@@ -112,6 +112,7 @@ class ReportModelTest(TestCase):
 
 
 class ReportsTestMixin:
+    """Provide reusable factory methods for report tests."""
 
     def create_user(self, username, password="Test1234"):
         return CustomUser.objects.create_user(
@@ -124,7 +125,7 @@ class ReportsTestMixin:
             name=name,
             address="Tehran",
         )
-    
+
     def create_membership(
         self,
         user,
@@ -184,11 +185,13 @@ class ReportsTestMixin:
 
 
 class AttendanceReportServiceTest(ReportsTestMixin, TestCase):
+    """Test attendance report services."""
 
     def setUp(self):
         self.gym = self.create_gym()
 
         self.user = self.create_user("trainer")
+
         self.create_membership(
             self.user,
             self.gym,
@@ -232,11 +235,19 @@ class AttendanceReportServiceTest(ReportsTestMixin, TestCase):
 
     def test_get_today_sessions(self):
         today = timezone.localdate()
+
         start = timezone.make_aware(
-            timezone.datetime.combine(today, time(10, 0))
+            timezone.datetime.combine(
+                today,
+                time(10, 0),
+            )
         )
+
         end = timezone.make_aware(
-            timezone.datetime.combine(today, time(11, 0))
+            timezone.datetime.combine(
+                today,
+                time(11, 0),
+            )
         )
 
         session = self.create_session(
@@ -245,20 +256,28 @@ class AttendanceReportServiceTest(ReportsTestMixin, TestCase):
             end,
         )
 
-        result = list(get_today_sessions(self.gym.id))
+        result = list(
+            get_today_sessions(self.gym.id)
+        )
 
         self.assertIn(session, result)
 
     def test_get_today_sessions_excludes_other_days(self):
         today = timezone.localdate()
-
         tomorrow = today + timedelta(days=1)
 
         start = timezone.make_aware(
-            timezone.datetime.combine(tomorrow, time(10, 0))
+            timezone.datetime.combine(
+                tomorrow,
+                time(10, 0),
+            )
         )
+
         end = timezone.make_aware(
-            timezone.datetime.combine(tomorrow, time(11, 0))
+            timezone.datetime.combine(
+                tomorrow,
+                time(11, 0),
+            )
         )
 
         session = self.create_session(
@@ -267,7 +286,9 @@ class AttendanceReportServiceTest(ReportsTestMixin, TestCase):
             end,
         )
 
-        result = list(get_today_sessions(self.gym.id))
+        result = list(
+            get_today_sessions(self.gym.id)
+        )
 
         self.assertNotIn(session, result)
 
@@ -288,13 +309,16 @@ class AttendanceReportServiceTest(ReportsTestMixin, TestCase):
             is_cancelled=False,
         )
 
-        result = list(get_cancelled_sessions(self.gym.id))
+        result = list(
+            get_cancelled_sessions(self.gym.id)
+        )
 
         self.assertIn(cancelled, result)
         self.assertNotIn(active, result)
 
 
 class ClassReportServiceTest(ReportsTestMixin, TestCase):
+    """Test class report services."""
 
     def setUp(self):
         self.gym = self.create_gym()
@@ -343,6 +367,7 @@ class ClassReportServiceTest(ReportsTestMixin, TestCase):
 
 
 class DashboardServiceTest(ReportsTestMixin, TestCase):
+    """Test dashboard report services."""
 
     def setUp(self):
         self.gym = self.create_gym()
@@ -453,10 +478,14 @@ class DashboardServiceTest(ReportsTestMixin, TestCase):
         self.assertIn("classes", result)
         self.assertIn("sessions", result)
 
-        self.assertEqual(result["gym"]["id"], self.gym.id)
+        self.assertEqual(
+            result["gym"]["id"],
+            self.gym.id,
+        )
 
 
 class MemberReportServiceTest(ReportsTestMixin, TestCase):
+    """Test member report services."""
 
     def setUp(self):
         self.gym = self.create_gym()
@@ -485,14 +514,18 @@ class MemberReportServiceTest(ReportsTestMixin, TestCase):
         )
 
     def test_get_member_report_statistics(self):
-        result = get_member_report_statistics(self.gym.id)
+        result = get_member_report_statistics(
+            self.gym.id
+        )
 
         self.assertEqual(result["total"], 2)
         self.assertEqual(result["active"], 2)
         self.assertEqual(result["inactive"], 0)
 
     def test_get_new_members(self):
-        result = list(get_new_members(self.gym.id))
+        result = list(
+            get_new_members(self.gym.id)
+        )
 
         self.assertEqual(len(result), 2)
 
@@ -507,13 +540,16 @@ class MemberReportServiceTest(ReportsTestMixin, TestCase):
         )
 
     def test_get_members_by_month(self):
-        result = list(get_members_by_month(self.gym.id))
+        result = list(
+            get_members_by_month(self.gym.id)
+        )
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["total"], 2)
 
 
 class StaffReportServiceTest(ReportsTestMixin, TestCase):
+    """Test staff report services."""
 
     def setUp(self):
         self.gym = self.create_gym()
@@ -552,7 +588,9 @@ class StaffReportServiceTest(ReportsTestMixin, TestCase):
         )
 
     def test_get_staff_report_statistics(self):
-        result = get_staff_report_statistics(self.gym.id)
+        result = get_staff_report_statistics(
+            self.gym.id
+        )
 
         self.assertEqual(result["owners"], 1)
         self.assertEqual(result["managers"], 1)
@@ -563,6 +601,7 @@ class StaffReportServiceTest(ReportsTestMixin, TestCase):
 
 
 class TrainerReportServiceTest(ReportsTestMixin, TestCase):
+    """Test trainer report services."""
 
     def setUp(self):
         self.gym = self.create_gym()
@@ -603,20 +642,31 @@ class TrainerReportServiceTest(ReportsTestMixin, TestCase):
         )
 
     def test_get_trainers_workload(self):
-        result = list(get_trainers_workload(self.gym.id))
+        result = list(
+            get_trainers_workload(self.gym.id)
+        )
 
         trainer1 = next(
-            item for item in result
+            item
+            for item in result
             if item.user == self.trainer1
         )
 
         trainer2 = next(
-            item for item in result
+            item
+            for item in result
             if item.user == self.trainer2
         )
 
-        self.assertEqual(trainer1.total_classes, 2)
-        self.assertEqual(trainer2.total_classes, 1)
+        self.assertEqual(
+            trainer1.total_classes,
+            2,
+        )
+
+        self.assertEqual(
+            trainer2.total_classes,
+            1,
+        )
 
     def test_get_trainers_workload_only_returns_trainers(self):
         member = self.create_user("member")
@@ -627,11 +677,15 @@ class TrainerReportServiceTest(ReportsTestMixin, TestCase):
             GymMembership.Role.MEMBER,
         )
 
-        result = list(get_trainers_workload(self.gym.id))
+        result = list(
+            get_trainers_workload(self.gym.id)
+        )
 
-        users = [item.user for item in result]
+        users = [
+            item.user
+            for item in result
+        ]
 
         self.assertNotIn(member, users)
         self.assertIn(self.trainer1, users)
         self.assertIn(self.trainer2, users)
-

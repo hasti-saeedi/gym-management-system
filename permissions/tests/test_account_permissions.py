@@ -5,25 +5,39 @@ from accounts.models import CustomUser
 from gyms.models import Gym, GymMembership
 
 from permissions.account_permissions import (
-    CanViewGymUsers,
     CanCreateGymUser,
-    CanViewGymUserDetail,
-    CanUpdateGymUser,
     CanDeleteGymUser,
-    CanViewMe,
+    CanUpdateGymUser,
     CanUpdateMe,
+    CanViewGymUserDetail,
+    CanViewGymUsers,
+    CanViewMe,
 )
 
 
 class AccountPermissionTestCase(TestCase):
+    """
+    Test permission classes related to account management.
+
+    The tests verify access for different gym roles, including:
+
+    - Owner
+    - Manager
+    - Staff
+    - Member
+    - Superuser
+    - Unauthenticated users
+
+    The tests also verify that users belonging to another gym
+    cannot access resources of the current gym.
+    """
 
     def setUp(self):
+        """Create users, gyms, memberships, and a mock view."""
+
         self.factory = APIRequestFactory()
 
-        # -----------------------------
         # Users
-        # -----------------------------
-
         self.owner = CustomUser.objects.create_user(
             username="owner",
             password="Test1234",
@@ -54,10 +68,7 @@ class AccountPermissionTestCase(TestCase):
             password="Test1234",
         )
 
-        # -----------------------------
         # Gyms
-        # -----------------------------
-
         self.gym = Gym.objects.create(
             name="Test Gym",
         )
@@ -66,17 +77,14 @@ class AccountPermissionTestCase(TestCase):
             name="Other Gym",
         )
 
-        # -----------------------------
         # Memberships
-        # -----------------------------
-
         GymMembership.objects.create(
-        user=self.owner,
-        gym=self.gym,
-        role=GymMembership.Role.OWNER,
-        salary=20,
-        share_percentage=30,
-    )
+            user=self.owner,
+            gym=self.gym,
+            role=GymMembership.Role.OWNER,
+            salary=20,
+            share_percentage=30,
+        )
 
         GymMembership.objects.create(
             user=self.manager,
@@ -104,13 +112,9 @@ class AccountPermissionTestCase(TestCase):
             role=GymMembership.Role.OWNER,
             salary=20,
             share_percentage=10,
-
         )
 
-        # -----------------------------
-        # View
-        # -----------------------------
-
+        # Mock view containing gym_id in URL kwargs
         self.view = type(
             "View",
             (),
@@ -121,12 +125,13 @@ class AccountPermissionTestCase(TestCase):
             },
         )()
 
-
     # =========================================================
     # CanViewGymUsers
     # =========================================================
 
     def test_can_view_gym_users_owner(self):
+        """Owner can view users of their gym."""
+
         request = self.factory.get("/")
         request.user = self.owner
 
@@ -139,8 +144,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_users_manager(self):
+        """Manager can view users of their gym."""
+
         request = self.factory.get("/")
         request.user = self.manager
 
@@ -153,8 +159,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_users_staff(self):
+        """Staff can view users of their gym."""
+
         request = self.factory.get("/")
         request.user = self.staff
 
@@ -167,8 +174,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_users_member_denied(self):
+        """Member cannot view users of their gym."""
+
         request = self.factory.get("/")
         request.user = self.member
 
@@ -181,8 +189,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_users_other_gym_denied(self):
+        """User from another gym cannot view this gym's users."""
+
         request = self.factory.get("/")
         request.user = self.other_owner
 
@@ -195,8 +204,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_users_superuser(self):
+        """Superuser can view users of any gym."""
+
         request = self.factory.get("/")
         request.user = self.superuser
 
@@ -209,16 +219,14 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_users_unauthenticated(self):
-        request = self.factory.get("/")
+        """Unauthenticated users cannot view gym users."""
 
+        request = self.factory.get("/")
         request.user = type(
             "AnonymousUser",
             (),
-            {
-                "is_authenticated": False,
-            },
+            {"is_authenticated": False},
         )()
 
         permission = CanViewGymUsers()
@@ -229,13 +237,14 @@ class AccountPermissionTestCase(TestCase):
                 self.view,
             )
         )
-
 
     # =========================================================
     # CanCreateGymUser
     # =========================================================
 
     def test_can_create_gym_user_owner(self):
+        """Owner can create users in their gym."""
+
         request = self.factory.post("/")
         request.user = self.owner
 
@@ -248,8 +257,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_create_gym_user_manager(self):
+        """Manager can create users in their gym."""
+
         request = self.factory.post("/")
         request.user = self.manager
 
@@ -262,8 +272,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_create_gym_user_staff_denied(self):
+        """Staff cannot create users in the gym."""
+
         request = self.factory.post("/")
         request.user = self.staff
 
@@ -276,8 +287,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_create_gym_user_member_denied(self):
+        """Member cannot create users in the gym."""
+
         request = self.factory.post("/")
         request.user = self.member
 
@@ -290,8 +302,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_create_gym_user_superuser(self):
+        """Superuser can create users in any gym."""
+
         request = self.factory.post("/")
         request.user = self.superuser
 
@@ -303,13 +316,14 @@ class AccountPermissionTestCase(TestCase):
                 self.view,
             )
         )
-
 
     # =========================================================
     # CanViewGymUserDetail
     # =========================================================
 
     def test_can_view_gym_user_detail_owner(self):
+        """Owner can view a user's details in their gym."""
+
         request = self.factory.get("/")
         request.user = self.owner
 
@@ -323,8 +337,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_user_detail_manager(self):
+        """Manager can view a user's details in their gym."""
+
         request = self.factory.get("/")
         request.user = self.manager
 
@@ -338,8 +353,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_user_detail_staff(self):
+        """Staff can view a user's details in their gym."""
+
         request = self.factory.get("/")
         request.user = self.staff
 
@@ -353,8 +369,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_user_detail_member_denied(self):
+        """Member cannot view another user's details."""
+
         request = self.factory.get("/")
         request.user = self.member
 
@@ -368,8 +385,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_gym_user_detail_superuser(self):
+        """Superuser can view user details."""
+
         request = self.factory.get("/")
         request.user = self.superuser
 
@@ -382,13 +400,14 @@ class AccountPermissionTestCase(TestCase):
                 self.member,
             )
         )
-
 
     # =========================================================
     # CanUpdateGymUser
     # =========================================================
 
     def test_can_update_gym_user_owner(self):
+        """Owner can update users in their gym."""
+
         request = self.factory.patch("/")
         request.user = self.owner
 
@@ -402,8 +421,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_update_gym_user_manager(self):
+        """Manager can update users in their gym."""
+
         request = self.factory.patch("/")
         request.user = self.manager
 
@@ -417,8 +437,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_update_gym_user_member_denied(self):
+        """Member cannot update another user's account."""
+
         request = self.factory.patch("/")
         request.user = self.member
 
@@ -432,8 +453,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_update_gym_user_superuser(self):
+        """Superuser can update users."""
+
         request = self.factory.patch("/")
         request.user = self.superuser
 
@@ -446,13 +468,14 @@ class AccountPermissionTestCase(TestCase):
                 self.member,
             )
         )
-
 
     # =========================================================
     # CanDeleteGymUser
     # =========================================================
 
     def test_can_delete_gym_user_owner(self):
+        """Owner can delete users in their gym."""
+
         request = self.factory.delete("/")
         request.user = self.owner
 
@@ -466,8 +489,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_delete_gym_user_manager(self):
+        """Manager can delete users in their gym."""
+
         request = self.factory.delete("/")
         request.user = self.manager
 
@@ -481,8 +505,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_delete_gym_user_member_denied(self):
+        """Member cannot delete another user's account."""
+
         request = self.factory.delete("/")
         request.user = self.member
 
@@ -496,8 +521,9 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_delete_gym_user_superuser(self):
+        """Superuser can delete users."""
+
         request = self.factory.delete("/")
         request.user = self.superuser
 
@@ -511,12 +537,13 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     # =========================================================
     # CanViewMe
     # =========================================================
 
     def test_can_view_me_authenticated(self):
+        """Authenticated users can view their own profile."""
+
         request = self.factory.get("/")
         request.user = self.member
 
@@ -529,16 +556,14 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_view_me_unauthenticated(self):
-        request = self.factory.get("/")
+        """Unauthenticated users cannot view their profile."""
 
+        request = self.factory.get("/")
         request.user = type(
             "AnonymousUser",
             (),
-            {
-                "is_authenticated": False,
-            },
+            {"is_authenticated": False},
         )()
 
         permission = CanViewMe()
@@ -550,12 +575,13 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     # =========================================================
     # CanUpdateMe
     # =========================================================
 
     def test_can_update_me_authenticated(self):
+        """Authenticated users can update their own profile."""
+
         request = self.factory.patch("/")
         request.user = self.member
 
@@ -568,16 +594,14 @@ class AccountPermissionTestCase(TestCase):
             )
         )
 
-
     def test_can_update_me_unauthenticated(self):
-        request = self.factory.patch("/")
+        """Unauthenticated users cannot update their profile."""
 
+        request = self.factory.patch("/")
         request.user = type(
             "AnonymousUser",
             (),
-            {
-                "is_authenticated": False,
-            },
+            {"is_authenticated": False},
         )()
 
         permission = CanUpdateMe()

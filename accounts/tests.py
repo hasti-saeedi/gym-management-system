@@ -4,72 +4,49 @@ from unittest.mock import patch
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.test import TestCase
-
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import CustomUser
-
 from accounts.services.authentication_services import (
     login_service,
     logout_service,
 )
-
 from accounts.services.user_services import (
-    update_current_user,
-    register_member,
     create_gym_user,
+    register_member,
+    update_current_user,
 )
+from gyms.models import Gym, GymMembership
 
-from gyms.models import (
-    Gym,
-    GymMembership,
-)
-
-
-# =========================================================
-# CustomUser Model Tests
-# =========================================================
 
 class CustomUserModelTest(TestCase):
+    """Test the behavior and validation of the CustomUser model."""
 
     def test_create_user(self):
-
+        """Test that a user can be created with valid credentials."""
         user = CustomUser.objects.create_user(
             username="testuser",
             password="Test1234",
             phone="09123456789",
         )
 
-        self.assertEqual(
-            user.username,
-            "testuser",
-        )
-
-        self.assertEqual(
-            user.phone,
-            "09123456789",
-        )
+        self.assertEqual(user.username, "testuser")
+        self.assertEqual(user.phone, "09123456789")
 
     def test_password_is_hashed(self):
-
+        """Test that the user's password is stored as a hash."""
         user = CustomUser.objects.create_user(
             username="testuser",
             password="Test1234",
         )
 
-        self.assertNotEqual(
-            user.password,
-            "Test1234",
-        )
-
-        self.assertTrue(
-            user.check_password("Test1234")
-        )
+        self.assertNotEqual(user.password, "Test1234")
+        self.assertTrue(user.check_password("Test1234"))
 
     def test_user_str_returns_full_name(self):
-
+        """Test that the string representation returns the user's full name."""
         user = CustomUser.objects.create_user(
             username="testuser",
             password="Test1234",
@@ -77,25 +54,19 @@ class CustomUserModelTest(TestCase):
             last_name="Saeedi",
         )
 
-        self.assertEqual(
-            str(user),
-            "Hasti Saeedi",
-        )
+        self.assertEqual(str(user), "Hasti Saeedi")
 
     def test_user_str_returns_username_when_name_is_empty(self):
-
+        """Test that the username is returned when the full name is empty."""
         user = CustomUser.objects.create_user(
             username="testuser",
             password="Test1234",
         )
 
-        self.assertEqual(
-            str(user),
-            "testuser",
-        )
+        self.assertEqual(str(user), "testuser")
 
     def test_valid_phone_number(self):
-
+        """Test that a valid phone number passes model validation."""
         user = CustomUser(
             username="testuser",
             password="Test1234",
@@ -104,13 +75,10 @@ class CustomUserModelTest(TestCase):
 
         user.full_clean()
 
-        self.assertEqual(
-            user.phone,
-            "09123456789",
-        )
+        self.assertEqual(user.phone, "09123456789")
 
     def test_invalid_phone_number(self):
-
+        """Test that an invalid phone number raises a validation error."""
         user = CustomUser(
             username="testuser",
             password="Test1234",
@@ -121,7 +89,7 @@ class CustomUserModelTest(TestCase):
             user.full_clean()
 
     def test_phone_number_must_be_unique(self):
-
+        """Test that duplicate phone numbers are rejected."""
         CustomUser.objects.create_user(
             username="user1",
             password="Test1234",
@@ -129,7 +97,6 @@ class CustomUserModelTest(TestCase):
         )
 
         with self.assertRaises(IntegrityError):
-
             CustomUser.objects.create_user(
                 username="user2",
                 password="Test1234",
@@ -137,18 +104,11 @@ class CustomUserModelTest(TestCase):
             )
 
 
-# =========================================================
-# Accounts Services Tests
-# =========================================================
-
 class AccountsServicesTest(TestCase):
+    """Test authentication and user management services."""
 
     def setUp(self):
-
-        # =========================
-        # Users
-        # =========================
-
+        """Set up users, a gym, and gym membership data for service tests."""
         self.user = CustomUser.objects.create_user(
             username="hasti",
             password="Test1234",
@@ -162,16 +122,11 @@ class AccountsServicesTest(TestCase):
             password="Test1234",
         )
 
-        # =========================
-        # Gym
-        # =========================
-
         self.gym = Gym.objects.create(
             name="Test Gym",
             address="Test Address",
         )
 
-        # Manager must have salary
         GymMembership.objects.create(
             user=self.creator,
             gym=self.gym,
@@ -179,92 +134,51 @@ class AccountsServicesTest(TestCase):
             salary=Decimal("15000.00"),
         )
 
-    # =====================================================
-    # login_service
-    # =====================================================
-
     def test_login_service_success(self):
-
+        """Test that valid credentials return user and authentication tokens."""
         result = login_service(
             "hasti",
             "Test1234",
         )
 
-        self.assertEqual(
-            result["user"],
-            self.user,
-        )
-
-        self.assertIn(
-            "access",
-            result,
-        )
-
-        self.assertIn(
-            "refresh",
-            result,
-        )
-
-        self.assertTrue(
-            result["access"],
-        )
-
-        self.assertTrue(
-            result["refresh"],
-        )
+        self.assertEqual(result["user"], self.user)
+        self.assertIn("access", result)
+        self.assertIn("refresh", result)
+        self.assertTrue(result["access"])
+        self.assertTrue(result["refresh"])
 
     def test_login_service_invalid_username(self):
-
+        """Test that an invalid username raises an authentication error."""
         with self.assertRaises(AuthenticationFailed):
-
             login_service(
                 "wrong_username",
                 "Test1234",
             )
 
     def test_login_service_invalid_password(self):
-
+        """Test that an invalid password raises an authentication error."""
         with self.assertRaises(AuthenticationFailed):
-
             login_service(
                 "hasti",
                 "WrongPassword",
             )
 
-    # =====================================================
-    # logout_service
-    # =====================================================
-
     def test_logout_service_success(self):
-
-        refresh = RefreshToken.for_user(
-            self.user
-        )
-
+        """Test that a valid refresh token can be used to log out."""
+        refresh = RefreshToken.for_user(self.user)
         refresh_token = str(refresh)
 
-        result = logout_service(
-            refresh_token
-        )
+        result = logout_service(refresh_token)
 
-        self.assertIsNone(
-            result
-        )
+        self.assertIsNone(result)
 
     def test_logout_service_invalid_token(self):
-
+        """Test that an invalid refresh token raises a validation error."""
         with self.assertRaises(DRFValidationError):
-
-            logout_service(
-                "invalid-refresh-token"
-            )
-
-    # =====================================================
-    # update_current_user
-    # =====================================================
+            logout_service("invalid-refresh-token")
 
     def test_update_current_user(self):
-
+        """Test that the current user's profile can be updated."""
         result = update_current_user(
             user=self.user,
             validated_data={
@@ -274,30 +188,16 @@ class AccountsServicesTest(TestCase):
             },
         )
 
-        self.assertEqual(
-            result,
-            self.user,
-        )
+        self.assertEqual(result, self.user)
 
         self.user.refresh_from_db()
 
-        self.assertEqual(
-            self.user.first_name,
-            "NewFirstName",
-        )
-
-        self.assertEqual(
-            self.user.last_name,
-            "NewLastName",
-        )
-
-        self.assertEqual(
-            self.user.email,
-            "new@example.com",
-        )
+        self.assertEqual(self.user.first_name, "NewFirstName")
+        self.assertEqual(self.user.last_name, "NewLastName")
+        self.assertEqual(self.user.email, "new@example.com")
 
     def test_update_current_user_partial_update(self):
-
+        """Test that only provided profile fields are updated."""
         result = update_current_user(
             user=self.user,
             validated_data={
@@ -305,44 +205,18 @@ class AccountsServicesTest(TestCase):
             },
         )
 
-        self.assertEqual(
-            result.first_name,
-            "NewFirstName",
-        )
-
-        self.assertEqual(
-            result.last_name,
-            "Saeedi",
-        )
-
-        self.assertEqual(
-            result.email,
-            "hasti@example.com",
-        )
+        self.assertEqual(result.first_name, "NewFirstName")
+        self.assertEqual(result.last_name, "Saeedi")
+        self.assertEqual(result.email, "hasti@example.com")
 
         self.user.refresh_from_db()
 
-        self.assertEqual(
-            self.user.first_name,
-            "NewFirstName",
-        )
-
-        self.assertEqual(
-            self.user.last_name,
-            "Saeedi",
-        )
-
-        self.assertEqual(
-            self.user.email,
-            "hasti@example.com",
-        )
-
-    # =====================================================
-    # register_member
-    # =====================================================
+        self.assertEqual(self.user.first_name, "NewFirstName")
+        self.assertEqual(self.user.last_name, "Saeedi")
+        self.assertEqual(self.user.email, "hasti@example.com")
 
     def test_register_member_success(self):
-
+        """Test that a new member is registered successfully."""
         result = register_member(
             validated_data={
                 "username": "newmember",
@@ -355,19 +229,9 @@ class AccountsServicesTest(TestCase):
             }
         )
 
-        self.assertIsInstance(
-            result,
-            CustomUser,
-        )
-
-        self.assertEqual(
-            result.username,
-            "newmember",
-        )
-
-        self.assertTrue(
-            result.check_password("Test1234")
-        )
+        self.assertIsInstance(result, CustomUser)
+        self.assertEqual(result.username, "newmember")
+        self.assertTrue(result.check_password("Test1234"))
 
         self.assertTrue(
             GymMembership.objects.filter(
@@ -378,7 +242,7 @@ class AccountsServicesTest(TestCase):
         )
 
     def test_register_member_creates_only_member_role(self):
-
+        """Test that public registration creates only a member role."""
         user = register_member(
             validated_data={
                 "username": "member2",
@@ -401,12 +265,8 @@ class AccountsServicesTest(TestCase):
             GymMembership.Role.MEMBER,
         )
 
-    # =====================================================
-    # create_gym_user
-    # =====================================================
-
     def test_create_gym_user_success(self):
-
+        """Test that a gym user is created with the specified role and salary."""
         result = create_gym_user(
             creator=self.creator,
             gym=self.gym,
@@ -422,19 +282,9 @@ class AccountsServicesTest(TestCase):
             },
         )
 
-        self.assertIsInstance(
-            result,
-            CustomUser,
-        )
-
-        self.assertEqual(
-            result.username,
-            "trainer1",
-        )
-
-        self.assertTrue(
-            result.check_password("Test1234")
-        )
+        self.assertIsInstance(result, CustomUser)
+        self.assertEqual(result.username, "trainer1")
+        self.assertTrue(result.check_password("Test1234"))
 
         membership = GymMembership.objects.get(
             user=result,
@@ -445,14 +295,13 @@ class AccountsServicesTest(TestCase):
             membership.role,
             GymMembership.Role.TRAINER,
         )
-
         self.assertEqual(
             membership.salary,
             Decimal("10000.00"),
         )
 
     def test_create_gym_user_with_share_percentage(self):
-
+        """Test that a gym user can be created with a share percentage."""
         result = create_gym_user(
             creator=self.creator,
             gym=self.gym,
@@ -468,10 +317,7 @@ class AccountsServicesTest(TestCase):
             },
         )
 
-        self.assertIsInstance(
-            result,
-            CustomUser,
-        )
+        self.assertIsInstance(result, CustomUser)
 
         membership = GymMembership.objects.get(
             user=result,
@@ -482,14 +328,13 @@ class AccountsServicesTest(TestCase):
             membership.role,
             GymMembership.Role.OWNER,
         )
-
         self.assertEqual(
             membership.share_percentage,
             Decimal("20.00"),
         )
 
     def test_create_gym_user_staff_with_salary(self):
-
+        """Test that a staff user can be created with a salary."""
         result = create_gym_user(
             creator=self.creator,
             gym=self.gym,
@@ -505,10 +350,7 @@ class AccountsServicesTest(TestCase):
             },
         )
 
-        self.assertIsInstance(
-            result,
-            CustomUser,
-        )
+        self.assertIsInstance(result, CustomUser)
 
         membership = GymMembership.objects.get(
             user=result,
@@ -519,34 +361,29 @@ class AccountsServicesTest(TestCase):
             membership.role,
             GymMembership.Role.STAFF,
         )
-
         self.assertEqual(
             membership.salary,
             Decimal("10000.00"),
         )
 
-    # =====================================================
-    # Transaction / Validation
-    # =====================================================
-
     def test_register_member_rolls_back_user_when_membership_fails(self):
-
+        """
+        Test that user creation is rolled back when membership creation fails.
+        """
         initial_user_count = CustomUser.objects.count()
 
         with patch(
             "accounts.services.user_services.GymMembership.save"
         ) as mock_save:
-
             mock_save.side_effect = DjangoValidationError(
                 {
                     "gym": [
-                        "Membership creation failed."
+                        "Membership creation failed.",
                     ]
                 }
             )
 
             with self.assertRaises(DRFValidationError):
-
                 register_member(
                     validated_data={
                         "username": "invalidmember",
@@ -566,6 +403,6 @@ class AccountsServicesTest(TestCase):
 
         self.assertFalse(
             CustomUser.objects.filter(
-                username="invalidmember"
+                username="invalidmember",
             ).exists()
         )

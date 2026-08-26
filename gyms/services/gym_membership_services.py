@@ -1,717 +1,3 @@
-# # from gyms.models import Gym,GymMembership
-# # from classes.models import ClassSession, GymClass
-# # from rest_framework.exceptions import NotFound
-# # from django.shortcuts import get_object_or_404
-# # from accounts.models import CustomUser
-# # from django.core.exceptions import ValidationError
-# # from django.utils import timezone
-
-
-# # # def add_staff(
-# # #     gym_id,
-# # #     user_id,
-# # #     role,
-# # #     salary,
-# # #     share_percentage=None,
-# # # ):
-
-# # #     gym = get_object_or_404(Gym, pk=gym_id)
-# # #     user = get_object_or_404(CustomUser, pk=user_id)
-
-# # #     if GymMembership.objects.filter(
-# # #         gym_id=gym_id,
-# # #         user_id=user_id,
-# # #         role=role,
-# # #     ).exists():
-# # #         raise ValidationError(
-# # #             "This user already has this role in this gym."
-        
-# # #         )
-# # #     membership = GymMembership.objects.create(
-# # #         gym=gym,
-# # #         user=user,
-# # #         role=role,
-# # #         salary=salary,
-# # #         share_percentage=share_percentage,
-# # #     )
-
-# # #     return membership
-
-
-
-# # #     #نمایش ممبر های ان جیم اععم از اونر و ترینر و ...
-
-# # from django.shortcuts import get_object_or_404
-# # from rest_framework.exceptions import ValidationError
-
-# # from accounts.models import CustomUser
-# # from gyms.models import Gym, GymMembership
-
-
-# # def can_manage_membership(actor, membership):
-# #     """
-# #     Check whether actor is allowed to manage the target membership.
-# #     """
-
-# #     # Superuser can manage everyone
-# #     if actor.is_superuser:
-# #         return True
-
-# #     actor_membership = GymMembership.objects.filter(
-# #         gym=membership.gym,
-# #         user=actor,
-# #         is_active=True,
-# #     ).first()
-
-# #     if actor_membership is None:
-# #         raise ValidationError(
-# #             "You are not a member of this gym."
-# #         )
-
-# #     # Owner can manage everyone except another Owner
-# #     if actor_membership.role == GymMembership.Role.OWNER:
-# #         if membership.role == GymMembership.Role.OWNER:
-# #             raise ValidationError(
-# #                 "Owner cannot manage another Owner."
-# #             )
-
-# #         return True
-
-# #     # Manager can manage Staff, Trainer and Member
-# #     if actor_membership.role == GymMembership.Role.MANAGER:
-# #         if membership.role in [
-# #             GymMembership.Role.STAFF,
-# #             GymMembership.Role.TRAINER,
-# #             GymMembership.Role.MEMBER,
-# #         ]:
-# #             return True
-
-# #         raise ValidationError(
-# #             "Manager cannot manage Owner or Manager."
-# #         )
-
-# #     # Staff / Trainer / Member
-# #     raise ValidationError(
-# #         "You do not have permission to manage this member."
-# #     )
-
-# # def add_staff(
-# #     actor,
-# #     gym_id,
-# #     user_id,
-# #     role,
-# #     salary,
-# #     share_percentage=None,
-# # ):
-# #     """
-# #     Add a new member to a gym with a specific role.
-
-# #     Parameters:
-# #         actor:
-# #             The authenticated user who is performing the operation.
-
-# #         gym_id:
-# #             ID of the gym where the new membership will be created.
-
-# #         user_id:
-# #             ID of the user who will be added to the gym.
-
-# #         role:
-# #             Role that will be assigned to the target user.
-
-# #         salary:
-# #             Salary associated with the membership.
-
-# #         share_percentage:
-# #             Optional percentage of revenue/share for the member.
-
-# #     Business Rules:
-# #         - Superuser can add any role.
-# #         - Owner can add Manager, Staff, or Trainer.
-# #         - Owner cannot add another Owner.
-# #         - Manager can add Staff or Trainer.
-# #         - Manager cannot add Owner or Manager.
-# #         - Staff cannot add anyone.
-# #         - Trainer cannot add anyone.
-# #         - User must not already have the same role
-# #           in the same gym.
-# #     """
-
-# #     # -------------------------------------------------
-# #     # 1. Get the gym
-# #     # -------------------------------------------------
-
-# #     gym = get_object_or_404(
-# #         Gym,
-# #         pk=gym_id,
-# #     )
-
-# #     # -------------------------------------------------
-# #     # 2. Get the user who will be added
-# #     # -------------------------------------------------
-
-# #     user = get_object_or_404(
-# #         CustomUser,
-# #         pk=user_id,
-# #     )
-
-# #     # -------------------------------------------------
-# #     # 3. Find actor's active membership in this gym
-# #     # -------------------------------------------------
-
-# #     actor_membership = GymMembership.objects.filter(
-# #         gym=gym,
-# #         user=actor,
-# #         is_active=True,
-# #     ).first()
-
-# #     # -------------------------------------------------
-# #     # 4. Check actor's permission based on role
-# #     # -------------------------------------------------
-
-# #     # Superuser can assign any role.
-# #     if actor.is_superuser:
-# #         pass
-
-# #     # User has no active membership in this gym.
-# #     elif actor_membership is None:
-# #         raise ValidationError(
-# #             "You are not a member of this gym."
-# #         )
-
-# #     # Owner can add Manager, Staff, and Trainer.
-# #     # Owner cannot add another Owner.
-# #     elif actor_membership.role == GymMembership.Role.OWNER:
-
-# #         if role == GymMembership.Role.OWNER:
-# #             raise ValidationError(
-# #                 "Owner cannot add another Owner."
-# #             )
-
-# #     # Manager can add Staff and Trainer.
-# #     elif actor_membership.role == GymMembership.Role.MANAGER:
-
-# #         if role not in [
-# #             GymMembership.Role.STAFF,
-# #             GymMembership.Role.TRAINER,
-# #             GymMembership.Role.MEMBER,
-# #         ]:
-# #             raise ValidationError(
-# #                 "Manager can only add Staff or Trainer."
-# #             )
-
-# #     # Staff and Trainer cannot add anyone.
-# #     else:
-# #         raise ValidationError(
-# #             "You do not have permission to add a member."
-# #         )
-
-# #     # -------------------------------------------------
-# #     # 5. Check duplicate membership
-# #     # -------------------------------------------------
-
-# #     if GymMembership.objects.filter(
-# #         gym=gym,
-# #         user=user,
-# #         role=role,
-# #     ).exists():
-
-# #         raise ValidationError(
-# #             "This user already has this role in this gym."
-# #         )
-
-# #     # -------------------------------------------------
-# #     # 6. Create membership
-# #     # -------------------------------------------------
-
-# #     membership = GymMembership.objects.create(
-# #         gym=gym,
-# #         user=user,
-# #         role=role,
-# #         salary=salary,
-# #         share_percentage=share_percentage,
-# #     )
-
-# #     # -------------------------------------------------
-# #     # 7. Return created membership
-# #     # -------------------------------------------------
-
-# #     return membership
-
-
-# # def get_gym_staff(gym_id):
-
-# #     members = GymMembership.objects.filter(
-# #         gym_id=gym_id,
-# #         is_active=True,
-# #     ).exclude(
-
-# #     role=GymMembership.Role.MEMBER
-
-# #     ).select_related("user")
-
-# #     if not members.exists():
-# #         raise NotFound("No active members found.")
-
-# #     return members
-
-
-# # def update_membership(
-# #     actor,
-# #     membership_id,
-# #     role,
-# #     salary,
-# #     share_percentage=None,
-# # ):
-
-# #     membership = get_object_or_404(  #object
-# #         GymMembership,
-# #         pk=membership_id,
-# #     )
-
-# #     # Check whether actor can manage this membership
-# #     can_manage_membership(
-# #         actor,
-# #         membership,
-# #     )
-        
-# #     # -------------------------------------------------
-# #     # Check the new role
-# #     # -------------------------------------------------
-
-# #     if role == GymMembership.Role.OWNER:
-# #         raise ValidationError(
-# #             "Owner role cannot be assigned."
-# #         )
-
-# #     # -------------------------------------------------
-# #     # Prevent duplicate role
-# #     # -------------------------------------------------
-
-# #     if GymMembership.objects.filter(
-# #         gym=membership.gym,
-# #         user=membership.user,
-# #         role=role,
-# #     ).exclude(
-# #         pk=membership.pk
-# #     ).exists():
-# #         raise ValidationError(
-# #             "This user already has this role in this gym."
-# #         )
-
-# #         #فقط مقدار داخل آبجکت در حافظه عوض می‌شود.
-# #     membership.role = role
-# #     membership.salary = salary
-# #     membership.share_percentage = share_percentage
-
-# #     membership.save()
-
-# #     return membership
-
-# # def deactivate_staff(
-# #         actor,
-# #         membership_id,
-# #         ):
-
-# #     membership = get_object_or_404(
-# #         GymMembership,
-# #         pk=membership_id,
-# #     )
-
-# #     # Check whether actor can manage this membership
-# #     can_manage_membership(
-# #         actor,
-# #         membership,
-# #     )
-
-# #     membership.is_active = False
-# #     membership.save()
-
-# #     return membership
-
-
-# from django.shortcuts import get_object_or_404
-# from rest_framework.exceptions import ValidationError, NotFound
-
-# from accounts.models import CustomUser
-# from gyms.models import Gym, GymMembership
-
-
-# # =========================================================
-# # Permission / Business Rule Helper
-# # =========================================================
-
-# def can_manage_membership(
-#     actor,
-#     membership,
-#     new_role=None,
-# ):
-#     """
-#     Check whether actor is allowed to manage the target membership.
-
-#     Hierarchy:
-
-#         OWNER
-#           ↓
-#         MANAGER
-#           ↓
-#         STAFF / TRAINER / MEMBER
-
-#     Rules:
-
-#     - Superuser can manage everyone.
-#     - Owner can manage Manager, Staff, Trainer and Member.
-#     - Owner cannot manage another Owner.
-#     - Owner cannot assign Owner role.
-#     - Manager can manage Staff, Trainer and Member.
-#     - Manager cannot manage Owner or Manager.
-#     - Manager can only assign Staff, Trainer or Member.
-#     - Staff, Trainer and Member cannot manage anyone.
-#     """
-
-#     # -----------------------------------------------------
-#     # Superuser
-#     # -----------------------------------------------------
-
-#     if actor.is_superuser:
-#         return True
-
-#     # -----------------------------------------------------
-#     # Get actor's active membership in target gym
-#     # -----------------------------------------------------
-
-#     actor_membership = GymMembership.objects.filter(
-#         gym=membership.gym,
-#         user=actor,
-#         is_active=True,
-#     ).first()
-
-#     if actor_membership is None:
-#         raise ValidationError(
-#             "You are not a member of this gym."
-#         )
-
-#     actor_role = actor_membership.role
-#     target_role = membership.role
-
-#     # =====================================================
-#     # OWNER
-#     # =====================================================
-
-#     if actor_role == GymMembership.Role.OWNER:
-
-#         # Owner cannot manage another Owner
-#         if target_role == GymMembership.Role.OWNER:
-#             raise ValidationError(
-#                 "Owner cannot manage another Owner."
-#             )
-
-#         # Owner cannot assign Owner role
-#         if new_role == GymMembership.Role.OWNER:
-#             raise ValidationError(
-#                 "Owner cannot assign Owner role."
-#             )
-
-#         return True
-
-#     # =====================================================
-#     # MANAGER
-#     # =====================================================
-
-#     if actor_role == GymMembership.Role.MANAGER:
-
-#         # Manager can only manage:
-#         # Staff, Trainer, Member
-#         if target_role not in [
-#             GymMembership.Role.STAFF,
-#             GymMembership.Role.TRAINER,
-#             GymMembership.Role.MEMBER,
-#         ]:
-#             raise ValidationError(
-#                 "Manager cannot manage Owner or Manager."
-#             )
-
-#         # Manager can only assign:
-#         # Staff, Trainer, Member
-#         if new_role is not None and new_role not in [
-#             GymMembership.Role.STAFF,
-#             GymMembership.Role.TRAINER,
-#             GymMembership.Role.MEMBER,
-#         ]:
-#             raise ValidationError(
-#                 "Manager can only assign Staff, Trainer or Member."
-#             )
-
-#         return True
-
-#     # =====================================================
-#     # STAFF / TRAINER / MEMBER
-#     # =====================================================
-
-#     raise ValidationError(
-#         "You do not have permission to manage members."
-#     )
-
-
-# # =========================================================
-# # Add Staff / Member
-# # =========================================================
-
-# def add_staff(
-#     actor,
-#     gym_id,
-#     user_id,
-#     role,
-#     salary,
-#     share_percentage=None,
-# ):
-#     """
-#     Add a new membership to a gym.
-
-#     Rules:
-
-#     - Superuser can add any role except restrictions defined
-#       by the business rules.
-#     - Owner can add Manager, Staff, Trainer and Member.
-#     - Owner cannot add Owner.
-#     - Manager can add Staff, Trainer and Member.
-#     - Manager cannot add Owner or Manager.
-#     - Staff, Trainer and Member cannot add anyone.
-#     - Same user cannot have duplicate role in same gym.
-#     """
-
-#     # -----------------------------------------------------
-#     # 1. Get gym
-#     # -----------------------------------------------------
-
-#     gym = get_object_or_404(
-#         Gym,
-#         pk=gym_id,
-#     )
-
-#     # -----------------------------------------------------
-#     # 2. Get target user
-#     # -----------------------------------------------------
-
-#     user = get_object_or_404(
-#         CustomUser,
-#         pk=user_id,
-#     )
-
-#     # -----------------------------------------------------
-#     # 3. Get actor's active membership
-#     # -----------------------------------------------------
-
-#     actor_membership = GymMembership.objects.filter(
-#         gym=gym,
-#         user=actor,
-#         is_active=True,
-#     ).first()
-
-#     # -----------------------------------------------------
-#     # 4. Check actor's permission
-#     # -----------------------------------------------------
-
-#     if actor.is_superuser:
-#         pass
-
-#     elif actor_membership is None:
-#         raise ValidationError(
-#             "You are not a member of this gym."
-#         )
-
-#     # -----------------------------------------------------
-#     # Owner
-#     # -----------------------------------------------------
-
-#     elif actor_membership.role == GymMembership.Role.OWNER:
-
-#         if role == GymMembership.Role.OWNER:
-#             raise ValidationError(
-#                 "Owner cannot add another Owner."
-#             )
-
-#     # -----------------------------------------------------
-#     # Manager
-#     # -----------------------------------------------------
-
-#     elif actor_membership.role == GymMembership.Role.MANAGER:
-
-#         if role not in [
-#             GymMembership.Role.STAFF,
-#             GymMembership.Role.TRAINER,
-#             GymMembership.Role.MEMBER,
-#         ]:
-#             raise ValidationError(
-#                 "Manager can only add Staff, Trainer or Member."
-#             )
-
-#     # -----------------------------------------------------
-#     # Staff / Trainer / Member
-#     # -----------------------------------------------------
-
-#     else:
-#         raise ValidationError(
-#             "You do not have permission to add a member."
-#         )
-
-#     # -----------------------------------------------------
-#     # 5. Prevent duplicate membership
-#     # -----------------------------------------------------
-
-#     if GymMembership.objects.filter(
-#         gym=gym,
-#         user=user,
-#         role=role,
-#     ).exists():
-#         raise ValidationError(
-#             "This user already has this role in this gym."
-#         )
-
-#     # -----------------------------------------------------
-#     # 6. Create membership
-#     # -----------------------------------------------------
-
-#     membership = GymMembership.objects.create(
-#         gym=gym,
-#         user=user,
-#         role=role,
-#         salary=salary,
-#         share_percentage=share_percentage,
-#     )
-
-#     return membership
-
-
-# # =========================================================
-# # Get Gym Staff
-# # =========================================================
-
-# def get_gym_staff(gym_id):
-
-#     members = (
-#         GymMembership.objects
-#         .filter(
-#             gym_id=gym_id,
-#             is_active=True,
-#         )
-#         .exclude(
-#             role=GymMembership.Role.MEMBER
-#         )
-#         .select_related("user")
-#     )
-
-#     if not members.exists():
-#         raise NotFound(
-#             "No active members found."
-#         )
-
-#     return members
-
-
-# # =========================================================
-# # Change Staff Role, salay, sharepercentage
-# # =========================================================
-
-# def update_membership(
-#     actor,
-#     membership_id,
-#     role,
-#     salary,
-#     share_percentage=None,
-# ):
-#     """
-#     Change the role and financial information of a membership.
-#     """
-
-#     # -----------------------------------------------------
-#     # 1. Get target membership
-#     # -----------------------------------------------------
-
-#     membership = get_object_or_404(
-#         GymMembership,
-#         pk=membership_id,
-#     )
-
-#     # -----------------------------------------------------
-#     # 2. Check permission
-#     # -----------------------------------------------------
-
-#     can_manage_membership(
-#         actor=actor,
-#         membership=membership,
-#         new_role=role,
-#     )
-
-#     # -----------------------------------------------------
-#     # 3. Prevent duplicate role
-#     # -----------------------------------------------------
-
-#     if GymMembership.objects.filter(
-#         gym=membership.gym,
-#         user=membership.user,
-#         role=role,
-#     ).exclude(
-#         pk=membership.pk
-#     ).exists():
-
-#         raise ValidationError(
-#             "This user already has this role in this gym."
-#         )
-
-#     # -----------------------------------------------------
-#     # 4. Update membership
-#     # -----------------------------------------------------
-
-#     membership.role = role
-#     membership.salary = salary
-#     membership.share_percentage = share_percentage
-
-#     membership.save()
-
-#     return membership
-
-
-# # =========================================================
-# # Deactivate Staff
-# # =========================================================
-
-# def deactivate_staff(
-#     actor,
-#     membership_id,
-# ):
-#     """
-#     Deactivate a gym membership.
-#     """
-
-#     # -----------------------------------------------------
-#     # 1. Get target membership
-#     # -----------------------------------------------------
-
-#     membership = get_object_or_404(
-#         GymMembership,
-#         pk=membership_id,
-#     )
-
-#     # -----------------------------------------------------
-#     # 2. Check permission
-#     # -----------------------------------------------------
-
-#     can_manage_membership(
-#         actor=actor,
-#         membership=membership,
-#     )
-
-#     # -----------------------------------------------------
-#     # 3. Deactivate membership
-#     # -----------------------------------------------------
-
-#     membership.is_active = False
-#     membership.save()
-
-#     return membership
-
-
 from django.shortcuts import get_object_or_404
 
 from rest_framework.exceptions import ValidationError
@@ -727,10 +13,13 @@ from gyms.models import Gym, GymMembership
 
 def can_manage_membership(actor, membership):
     """
-    Check whether actor is allowed to manage
-    the target membership.
+    Check whether the authenticated actor can manage
+    the target gym membership.
 
-    Hierarchy:
+    This function implements the gym membership management
+    permission hierarchy at the service/business-logic layer.
+
+    Role hierarchy:
 
         Superuser
             ↓
@@ -743,18 +32,42 @@ def can_manage_membership(actor, membership):
     Rules:
 
         Superuser:
-            Can manage everyone.
+            Can manage every membership.
 
         Owner:
-            Can manage Manager, Staff, Trainer, Member.
+            Can manage Manager, Staff, Trainer, and Member.
             Cannot manage another Owner.
 
         Manager:
-            Can manage Staff, Trainer, Member.
+            Can manage Staff, Trainer, and Member.
             Cannot manage Owner or Manager.
 
-        Staff / Trainer / Member:
-            Cannot manage anyone.
+        Staff:
+            Cannot manage memberships.
+
+        Trainer:
+            Cannot manage memberships.
+
+        Member:
+            Cannot manage memberships.
+
+    Args:
+        actor:
+            The user performing the operation.
+
+        membership:
+            The GymMembership object that the actor wants
+            to manage.
+
+    Returns:
+        bool:
+            Returns True when the actor is allowed to manage
+            the target membership.
+
+    Raises:
+        ValidationError:
+            If the actor is not an active member of the gym
+            or does not have sufficient privileges.
     """
 
     # --------------------------------------------------------
@@ -765,7 +78,7 @@ def can_manage_membership(actor, membership):
         return True
 
     # --------------------------------------------------------
-    # Get actor's active membership
+    # Get actor's active membership in the target gym
     # --------------------------------------------------------
 
     actor_membership = GymMembership.objects.filter(
@@ -825,33 +138,59 @@ def can_manage_membership(actor, membership):
 
 def can_assign_role(actor, membership, new_role):
     """
-    Check whether actor can assign the new role
+    Check whether the actor is allowed to assign a new role
     to the target membership.
+
+    This function is responsible only for validating whether
+    the actor has permission to assign the requested role.
+    It does not modify the membership.
 
     Rules:
 
+        Superuser:
+            Can assign any role.
+
         Owner:
             Can assign:
-                Manager
-                Staff
-                Trainer
-                Member
+                - Manager
+                - Staff
+                - Trainer
+                - Member
 
             Cannot assign:
-                Owner
+                - Owner
 
         Manager:
             Can assign:
-                Staff
-                Trainer
-                Member
+                - Staff
+                - Trainer
+                - Member
 
             Cannot assign:
-                Owner
-                Manager
+                - Owner
+                - Manager
 
-        Superuser:
-            Can assign any role.
+        Staff / Trainer / Member:
+            Cannot assign roles.
+
+    Args:
+        actor:
+            The user performing the operation.
+
+        membership:
+            The GymMembership whose role will be changed.
+
+        new_role:
+            The role that the actor wants to assign.
+
+    Returns:
+        bool:
+            Returns True when the actor can assign the role.
+
+    Raises:
+        ValidationError:
+            If the actor is not an active member of the gym
+            or does not have permission to assign the requested role.
     """
 
     # --------------------------------------------------------
@@ -862,7 +201,7 @@ def can_assign_role(actor, membership, new_role):
         return True
 
     # --------------------------------------------------------
-    # Get actor membership
+    # Get actor's active membership
     # --------------------------------------------------------
 
     actor_membership = GymMembership.objects.filter(
@@ -929,23 +268,76 @@ def add_staff(
     share_percentage=None,
 ):
     """
-    Create a new GymMembership.
+    Create a new GymMembership for a user in a gym.
 
-    Rules:
+    The function performs all business-rule checks required
+    before creating a membership.
+
+    Permission rules:
 
         Superuser:
             Can add any role.
 
         Owner:
-            Can add Manager, Staff, Trainer, Member.
-            Cannot add Owner.
+            Can add:
+                - Manager
+                - Staff
+                - Trainer
+                - Member
+
+            Cannot add:
+                - Owner
 
         Manager:
-            Can add Staff, Trainer, Member.
-            Cannot add Owner or Manager.
+            Can add:
+                - Staff
+                - Trainer
+                - Member
+
+            Cannot add:
+                - Owner
+                - Manager
 
         Staff / Trainer / Member:
-            Cannot add anyone.
+            Cannot add new memberships.
+
+    Additional business rule:
+
+        A user cannot have the same active role more than
+        once in the same gym.
+
+    Args:
+        actor:
+            The authenticated user performing the operation.
+
+        gym_id:
+            ID of the gym where the membership will be created.
+
+        user_id:
+            ID of the user who will become a gym member.
+
+        role:
+            Role assigned to the target user.
+
+        salary:
+            Salary associated with the membership.
+
+        share_percentage:
+            Optional revenue-share percentage associated
+            with the membership.
+
+    Returns:
+        GymMembership:
+            The newly created membership.
+
+    Raises:
+        NotFound:
+            If the gym or target user does not exist.
+
+        ValidationError:
+            If the actor does not have permission to add
+            the membership or the user already has the
+            same active role in the gym.
     """
 
     # --------------------------------------------------------
@@ -976,7 +368,7 @@ def add_staff(
     else:
 
         # ----------------------------------------------------
-        # Get actor membership
+        # Get actor's active membership
         # ----------------------------------------------------
 
         actor_membership = GymMembership.objects.filter(
@@ -1064,10 +456,32 @@ def add_staff(
 
 def get_gym_staff(gym_id):
     """
-    Return active non-member staff of a gym.
+    Return all active staff memberships of a gym.
 
-    Excludes:
-        Member
+    Members whose role is ``MEMBER`` are excluded.
+    Therefore, the returned queryset contains only gym
+    employees such as:
+
+        - Owner
+        - Manager
+        - Staff
+        - Trainer
+
+    The related user object is loaded using ``select_related``
+    to reduce additional database queries when accessing
+    membership.user.
+
+    Args:
+        gym_id:
+            ID of the gym whose staff should be retrieved.
+
+    Returns:
+        QuerySet:
+            Active non-member GymMembership objects.
+
+    Raises:
+        NotFound:
+            If the gym has no active staff memberships.
     """
 
     members = (
@@ -1104,13 +518,55 @@ def update_membership(
     """
     Update an existing GymMembership.
 
-    Can change:
+    The function can update the following fields:
 
         - role
         - salary
         - share_percentage
 
-    Permission hierarchy is checked before update.
+    Before changing the membership, the actor's permission
+    to manage the target membership is checked.
+
+    If a new role is provided, an additional role-assignment
+    permission check is performed.
+
+    Business rules:
+
+        - Actor must have permission to manage the membership.
+        - Owner cannot assign the Owner role.
+        - Manager cannot assign Owner or Manager.
+        - Staff / Trainer / Member cannot modify memberships.
+        - A user cannot have the same active role twice
+          in the same gym.
+
+    Args:
+        actor:
+            The authenticated user performing the operation.
+
+        membership_id:
+            ID of the GymMembership to update.
+
+        role:
+            Optional new role for the membership.
+
+        salary:
+            Optional new salary.
+
+        share_percentage:
+            Optional new revenue-share percentage.
+
+    Returns:
+        GymMembership:
+            The updated membership.
+
+    Raises:
+        NotFound:
+            If the membership does not exist.
+
+        ValidationError:
+            If the actor does not have permission to update
+            the membership or the new role conflicts with
+            an existing active membership.
     """
 
     # --------------------------------------------------------
@@ -1123,7 +579,7 @@ def update_membership(
     )
 
     # --------------------------------------------------------
-    # Check target membership
+    # Check management permission
     # --------------------------------------------------------
 
     can_manage_membership(
@@ -1132,7 +588,7 @@ def update_membership(
     )
 
     # --------------------------------------------------------
-    # Role
+    # Update Role
     # --------------------------------------------------------
 
     if role is not None:
@@ -1161,21 +617,21 @@ def update_membership(
         membership.role = role
 
     # --------------------------------------------------------
-    # Salary
+    # Update Salary
     # --------------------------------------------------------
 
     if salary is not None:
         membership.salary = salary
 
     # --------------------------------------------------------
-    # Share Percentage
+    # Update Share Percentage
     # --------------------------------------------------------
 
     if share_percentage is not None:
         membership.share_percentage = share_percentage
 
     # --------------------------------------------------------
-    # Save
+    # Save Changes
     # --------------------------------------------------------
 
     membership.save()
@@ -1194,15 +650,49 @@ def deactivate_staff(
     """
     Deactivate an existing GymMembership.
 
-    Owner:
-        Can deactivate Manager / Staff / Trainer / Member.
+    Deactivation is implemented as a soft status change.
+    The membership record is not deleted from the database.
 
-    Manager:
-        Can deactivate Staff / Trainer / Member.
+    Permission hierarchy:
 
-    Superuser:
-        Can deactivate everyone.
+        Superuser:
+            Can deactivate everyone.
+
+        Owner:
+            Can deactivate Manager, Staff, Trainer, and Member.
+
+        Manager:
+            Can deactivate Staff, Trainer, and Member.
+
+        Staff / Trainer / Member:
+            Cannot deactivate memberships.
+
+    The function also prevents deactivating a membership that
+    is already inactive.
+
+    Args:
+        actor:
+            The authenticated user performing the operation.
+
+        membership_id:
+            ID of the GymMembership to deactivate.
+
+    Returns:
+        GymMembership:
+            The deactivated membership.
+
+    Raises:
+        NotFound:
+            If the membership does not exist.
+
+        ValidationError:
+            If the actor does not have permission or the
+            membership is already inactive.
     """
+
+    # --------------------------------------------------------
+    # Get Membership
+    # --------------------------------------------------------
 
     membership = get_object_or_404(
         GymMembership,
@@ -1210,7 +700,7 @@ def deactivate_staff(
     )
 
     # --------------------------------------------------------
-    # Check permission
+    # Check Permission
     # --------------------------------------------------------
 
     can_manage_membership(
@@ -1219,7 +709,7 @@ def deactivate_staff(
     )
 
     # --------------------------------------------------------
-    # Already inactive
+    # Check Current Status
     # --------------------------------------------------------
 
     if not membership.is_active:
@@ -1228,7 +718,7 @@ def deactivate_staff(
         )
 
     # --------------------------------------------------------
-    # Deactivate
+    # Deactivate Membership
     # --------------------------------------------------------
 
     membership.is_active = False
@@ -1251,8 +741,50 @@ def activate_staff(
     """
     Activate an existing GymMembership.
 
-    Same hierarchy as Deactivate.
+    Activation changes the ``is_active`` field from False
+    to True without creating a new membership record.
+
+    The same permission hierarchy used for membership
+    management applies:
+
+        Superuser:
+            Can activate everyone.
+
+        Owner:
+            Can activate Manager, Staff, Trainer, and Member.
+
+        Manager:
+            Can activate Staff, Trainer, and Member.
+
+        Staff / Trainer / Member:
+            Cannot activate memberships.
+
+    The function prevents activating a membership that is
+    already active.
+
+    Args:
+        actor:
+            The authenticated user performing the operation.
+
+        membership_id:
+            ID of the GymMembership to activate.
+
+    Returns:
+        GymMembership:
+            The activated membership.
+
+    Raises:
+        NotFound:
+            If the membership does not exist.
+
+        ValidationError:
+            If the actor does not have permission or the
+            membership is already active.
     """
+
+    # --------------------------------------------------------
+    # Get Membership
+    # --------------------------------------------------------
 
     membership = get_object_or_404(
         GymMembership,
@@ -1260,7 +792,7 @@ def activate_staff(
     )
 
     # --------------------------------------------------------
-    # Check permission
+    # Check Permission
     # --------------------------------------------------------
 
     can_manage_membership(
@@ -1269,7 +801,7 @@ def activate_staff(
     )
 
     # --------------------------------------------------------
-    # Already active
+    # Check Current Status
     # --------------------------------------------------------
 
     if membership.is_active:
@@ -1278,7 +810,7 @@ def activate_staff(
         )
 
     # --------------------------------------------------------
-    # Activate
+    # Activate Membership
     # --------------------------------------------------------
 
     membership.is_active = True
@@ -1288,4 +820,3 @@ def activate_staff(
     )
 
     return membership
-

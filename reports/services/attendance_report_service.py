@@ -1,29 +1,30 @@
-from django.db.models import Count
-from classes.models import ClassSession
-from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from classes.models import ClassSession
 from gyms.models import Gym
 
 
 def get_attendance_statistics(gym_id):
+    """Return attendance statistics for sessions belonging to a gym."""
 
-    gym = get_object_or_404(
-    Gym,
-    pk=gym_id,
-)
+    get_object_or_404(
+        Gym,
+        pk=gym_id,
+    )
+
     queryset = ClassSession.objects.filter(
-        # gym_class__gym_id=gym
-        gym_class__gym_id=gym_id
+        gym_class__gym_id=gym_id,
     )
 
     total_sessions = queryset.count()
 
     cancelled_sessions = queryset.filter(
-        is_cancelled=True
+        is_cancelled=True,
     ).count()
 
     active_sessions = queryset.filter(
-        is_cancelled=False
+        is_cancelled=False,
     ).count()
 
     return {
@@ -32,33 +33,40 @@ def get_attendance_statistics(gym_id):
         "cancelled_sessions": cancelled_sessions,
     }
 
-def get_today_sessions(gym_id):
 
-    gym = get_object_or_404(
-    Gym,
-    pk=gym_id,
-)
+def get_today_sessions(gym_id):
+    """Return today's sessions for a gym ordered by start time."""
+
+    get_object_or_404(
+        Gym,
+        pk=gym_id,
+    )
 
     today = timezone.localdate()
 
-    queryset = ClassSession.objects.filter(
-        # gym_class__gym_id=gym,
-        gym_class__gym_id=gym_id,
-        start_time__date=today,
-    ).order_by("start_time")
+    return (
+        ClassSession.objects
+        .filter(
+            gym_class__gym_id=gym_id,
+            start_time__date=today,
+        )
+        .order_by("start_time")
+    )
 
-    return queryset
 
 def get_cancelled_sessions(gym_id):
+    """Return cancelled sessions for a gym ordered by most recent first."""
 
-    gym = get_object_or_404(
-    Gym,
-    pk=gym_id,
-)
-    queryset = ClassSession.objects.filter(
-        # gym_class__gym_id=gym,
-        gym_class__gym_id=gym_id,
-        is_cancelled=True,
-    ).order_by("-start_time")
+    get_object_or_404(
+        Gym,
+        pk=gym_id,
+    )
 
-    return queryset
+    return (
+        ClassSession.objects
+        .filter(
+            gym_class__gym_id=gym_id,
+            is_cancelled=True,
+        )
+        .order_by("-start_time")
+    )
