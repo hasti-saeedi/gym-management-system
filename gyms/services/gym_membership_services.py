@@ -630,6 +630,9 @@ def update_membership(
     if share_percentage is not None:
         membership.share_percentage = share_percentage
 
+    if membership.role != GymMembership.Role.OWNER:
+        membership.share_percentage = None
+
     # --------------------------------------------------------
     # Save Changes
     # --------------------------------------------------------

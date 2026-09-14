@@ -272,6 +272,12 @@ class GymMembershipViewSet(viewsets.ModelViewSet):
             for permission in permission_classes
         ]
 
+
+    @extend_schema(
+        request=AddStaffSerializer,
+        responses=GymStaffSerializer,
+    )
+
     def create(self, request, *args, **kwargs):
         """Create a new gym membership."""
 
@@ -300,6 +306,7 @@ class GymMembershipViewSet(viewsets.ModelViewSet):
             ).data,
             status=status.HTTP_201_CREATED,
         )
+
 
     @extend_schema(
         request=ChangeStaffRoleSerializer,
