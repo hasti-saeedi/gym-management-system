@@ -17,6 +17,7 @@ class GymClassSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "created_at",
+            "gym",
         ]
 
     def create(self, validated_data):
@@ -39,6 +40,41 @@ class GymClassSerializer(serializers.ModelSerializer):
 
         return gym_class
 
+
+class GymClassCreateSerializer(serializers.ModelSerializer):
+    regular_days = serializers.ListField(
+        child=serializers.IntegerField(
+            min_value=0,
+            max_value=6,
+        ),
+    )
+
+    class Meta:
+        model = GymClass
+        fields = [
+            "name",
+            "category",
+            "current_enrolled",
+            "capacity",
+            "duration_minutes",
+            "price",
+            "single_session_price",
+            "description",
+            "is_active",
+            "regular_days",
+            "start_time",
+            "end_time",
+            "total_sessions",
+            "start_date",
+            "end_date",
+            "trainer",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+        ]
+
+        
 
 class ClassSessionSerializer(serializers.ModelSerializer):
     """

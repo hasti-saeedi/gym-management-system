@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from accounts.models import CustomUser
-from classes.models import ClassSession, GymClass
+# from classes.models import ClassSession, GymClass
 
 
 class Enrollment(models.Model):
@@ -25,7 +25,7 @@ class Enrollment(models.Model):
     ]
 
     gym_class = models.ForeignKey(
-        GymClass,
+        "classes.GymClass",
         on_delete=models.CASCADE,
         related_name="enrollments",
     )
@@ -47,8 +47,9 @@ class Enrollment(models.Model):
         choices=ENROLLMENT_TYPE,
         default="semester",
     )
+    
     selected_sessions = models.ManyToManyField(
-        ClassSession,
+        "classes.ClassSession",
         blank=True,
         related_name="single_enrollments",
     )

@@ -177,7 +177,6 @@ class GymMembershipViewSet(viewsets.ModelViewSet):
     """ViewSet for managing gym memberships."""
 
     queryset = GymMembership.objects.all()
-    serializer_class = GymMembershipSerializer
 
     filter_backends = [
         DjangoFilterBackend,
@@ -215,7 +214,7 @@ class GymMembershipViewSet(viewsets.ModelViewSet):
         ]:
             return None
 
-        return self.serializer_class
+        return GymMembershipSerializer
 
     def get_queryset(self):
         """Return memberships belonging to the gym specified in the URL."""

@@ -3,7 +3,6 @@ from django.db import models
 
 from gyms.models import GymMembership
 
-
 class GymClass(models.Model):
     """
     Represent a class offered by a gym.
@@ -55,6 +54,7 @@ class GymClass(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     regular_days = models.JSONField(default=list)
+
     start_time = models.TimeField(
         null=True,
         blank=True,
@@ -133,6 +133,21 @@ class GymClass(models.Model):
             })
 
         if self.start_date and self.end_date and self.regular_days:
+            if not isinstance(self.regular_days, list):
+                raise ValidationError({
+                    "regular_days": "regular_days must be a list.",
+                })
+
+            if not all(
+                isinstance(day, int) and 0 <= day <= 6
+                for day in self.regular_days
+            ):
+                raise ValidationError({
+                    "regular_days": (
+                        "Each regular day must be an integer between 0 and 6."
+                    ),
+                })
+
             from .services.gym_class_services import calculate_session_dates
 
             expected_sessions = len(
@@ -155,6 +170,7 @@ class GymClass(models.Model):
         """
         Save the gym class instance to the database.
         """
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):

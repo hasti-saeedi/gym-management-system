@@ -1,14 +1,17 @@
 from rest_framework import viewsets, status
 
 from .serializers import (
+    GymClassCreateSerializer,
     GymClassSerializer,
     ClassSessionSerializer,
     AttendanceSerializer,
     SessionStudentSerializer,
 )
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import ValidationError
 
 from rest_framework.decorators import action
-from gyms.models import GymMembership
+from gyms.models import GymMembership, Gym
 from .models import GymClass, ClassSession
 from rest_framework.response import Response
 
@@ -65,8 +68,27 @@ class GymClassViewSet(viewsets.ModelViewSet):
         CanManageGymClass.
     """
 
-    queryset = GymClass.objects.all()
-    serializer_class = GymClassSerializer
+    def get_queryset(self):
+        """
+        Return gym classes belonging to the gym specified in the URL.
+        """
+
+        gym_id = self.kwargs.get("gym_id")
+
+        if gym_id is not None:
+            return GymClass.objects.filter(
+                gym_id=gym_id,
+            )
+
+        return GymClass.objects.all()
+
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return GymClassCreateSerializer
+
+        return GymClassSerializer
+
 
     filter_backends = [
         DjangoFilterBackend,
@@ -167,6 +189,70 @@ class GymClassViewSet(viewsets.ModelViewSet):
         ]
 
 
+    @extend_schema(
+    request=GymClassCreateSerializer,
+    responses=GymClassSerializer,
+    )
+    @extend_schema(
+    request=GymClassCreateSerializer,
+    responses=GymClassSerializer,
+)
+    def create(self, request, *args, **kwargs):
+        """
+        Create a gym class for the gym specified in the URL.
+        """
+
+        serializer = self.get_serializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        gym = get_object_or_404(
+            Gym,
+            pk=kwargs["gym_id"],
+        )
+ 
+
+        if GymClass.objects.filter(
+            gym=gym,
+            trainer=serializer.validated_data["trainer"],
+            start_time=serializer.validated_data["start_time"],
+        ).exists():
+            return Response(
+                {
+                    "detail": (
+                        "A class with the same  trainer, "
+                        "and start time already exists in this gym."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            gym_class = serializer.save(
+                gym=gym,
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                exc.message_dict,
+            )
+
+        headers = self.get_success_headers(
+            serializer.data,
+        )
+
+        return Response(
+            GymClassSerializer(
+                gym_class,
+            ).data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
+
+    
 class ClassSessionViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing class sessions.
