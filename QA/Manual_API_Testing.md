@@ -83,3 +83,23 @@ Run the command in the project's configured Python environment and follow the pr
 ## 8. Notes
 
 This document summarizes the manual API testing activities performed on the project. Detailed test results should reflect the actual observed behavior of the API and should not be inferred solely from the expected results.
+
+## 9. API Coverage Checklist
+
+This checklist is used to review the API endpoints documented in Swagger/OpenAPI and track the status of manual Postman testing.
+
+| Module | Endpoint | HTTP Method | Scenario Tested | Result |
+|---|---|---|---|---|
+| Accounts | To be filled from Swagger | To be filled | To be verified | Not recorded |
+| Gyms | To be filled from Swagger | To be filled | To be verified | Not recorded |
+| Classes | To be filled from Swagger | To be filled | To be verified | Not recorded |
+| Enrollments | To be filled from Swagger | To be filled | To be verified | Not recorded |
+| Reports | To be filled from Swagger | To be filled | To be verified | Not recorded |
+
+**Status definitions**
+- Pass: Actual response matched the expected result.
+- Fail: Actual response did not match the expected result.
+- Not recorded: No verifiable execution result is documented.
+- Not applicable: The scenario does not apply to the endpoint.
+
+**Note:** This checklist is a starting point. Add the actual endpoint paths and HTTP methods from Swagger. Do not mark a test as Pass or Fail without a recorded or reproducible result.
