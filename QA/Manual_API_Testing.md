@@ -103,3 +103,31 @@ This checklist is used to review the API endpoints documented in Swagger/OpenAPI
 - Not applicable: The scenario does not apply to the endpoint.
 
 **Note:** This checklist is a starting point. Add the actual endpoint paths and HTTP methods from Swagger. Do not mark a test as Pass or Fail without a recorded or reproducible result.
+
+
+## Manual Testing Execution Notes
+
+### Testing Approach
+
+The API endpoints were manually tested using Postman. Requests were executed with different input data, and the actual responses were compared with the expected results.
+
+### Test Scenarios Covered
+
+- Normal requests with different input data
+- Invalid input and missing required fields
+- Authentication and access permissions
+- CRUD operations (Create, Read, Update, Delete)
+- HTTP status codes and error responses
+
+### Test Evidence and Limitations
+
+The tests were executed manually during development. However, individual response details and execution results were not saved at the time of testing.
+
+Therefore, historical Pass/Fail results are not available for verification. Individual test results will be recorded when the relevant scenarios are executed again.
+
+### Next Steps
+
+- Save the API requests in a Postman Collection.
+- Record expected and actual results for selected test scenarios.
+- Document verified Pass/Fail results.
+- Keep manual API testing documentation separate from Django automated tests.
